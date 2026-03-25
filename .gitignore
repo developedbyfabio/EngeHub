@@ -19,3 +19,9 @@
 # OS
 .DS_Store
 Thumbs.db
+
+# Arquivos
+*.tar.gz
+*.sql
+*.sql.gz
+
