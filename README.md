@@ -251,8 +251,8 @@ Após a instalação, você pode acessar:
 
 - **URL Pública**: http://engehub.local
 - **Área Administrativa**: http://engehub.local/login
-- **Email**: admin@engehub.com
-- **Senha**: Jgr34eng02@
+- **Email**: admin@engepecas.com
+- **Senha**: admin123
 
 ## 📁 Estrutura do Projeto
 
