@@ -1,0 +1,20 @@
+{
+  "resources/css/app.css": {
+    "file": "assets/app-a0b09a13.css",
+    "isEntry": true,
+    "src": "resources/css/app.css"
+  },
+  "resources/js/app.js": {
+    "dynamicImports": [
+      "resources/js/servers-tiles-sortable.js"
+    ],
+    "file": "assets/app-2e115e6d.js",
+    "isEntry": true,
+    "src": "resources/js/app.js"
+  },
+  "resources/js/servers-tiles-sortable.js": {
+    "file": "assets/servers-tiles-sortable-a6aa608a.js",
+    "isDynamicEntry": true,
+    "src": "resources/js/servers-tiles-sortable.js"
+  }
+}
