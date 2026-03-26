@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class NetworkMap extends Model
 {
@@ -21,95 +22,117 @@ class NetworkMap extends Model
     ];
 
     /**
-     * Relacionamento: um mapa tem muitas mesas
+     * @deprecated Legado (tabela seats). O mapa usa {@see devices()}.
      */
-    public function seats()
+    public function seats(): HasMany
     {
         return $this->hasMany(Seat::class);
     }
 
-    /**
-     * Scope: apenas mapas ativos
-     */
+    public function devices(): HasMany
+    {
+        return $this->hasMany(Device::class);
+    }
+
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
     }
 
-    /**
-     * Accessor: caminho completo do arquivo SVG
-     */
     public function getFullPathAttribute()
     {
         return public_path($this->file_path . $this->file_name);
     }
 
-    /**
-     * Accessor: URL do arquivo SVG
-     */
     public function getFileUrlAttribute()
     {
         return asset($this->file_path . $this->file_name);
     }
 
-    /**
-     * Verifica se o arquivo SVG existe fisicamente
-     */
     public function fileExists()
     {
         return file_exists($this->full_path);
     }
 
-    /**
-     * Carrega o conteúdo do SVG
-     */
     public function getSvgContent()
     {
         if ($this->fileExists()) {
             return file_get_contents($this->full_path);
         }
+
         return null;
     }
 
     /**
-     * Varredura: extrai códigos de mesas do SVG (text/tspan que batem com o padrão)
-     * e sincroniza com a tabela seats. Cria mesas que não existem; não remove as que existem.
-     * Padrão: uma ou mais letras maiúsculas + exatamente 2 dígitos (ex: A01, D01, RH04, ADM02).
+     * Lê SVG, detecta rótulos (Device::parseSvgLabel) em text/tspan/foreignObject.
+     *
+     * Para cada dispositivo no SVG: {@see firstOrCreate} por (network_map_id, type, code).
+     * Registros já existentes não são alterados (metadata, observações, setor, etc. mantidos).
+     * Dispositivos que deixaram de aparecer no SVG não são apagados.
+     *
+     * @return int Quantidade de dispositivos únicos encontrados no SVG (incluindo os que já existiam)
      */
-    public function syncSeatsFromSvg()
+    public function syncDevicesFromSvg(): int
     {
         $content = $this->getSvgContent();
-        if (!$content) {
+        if (! $content) {
             return 0;
         }
 
         libxml_use_internal_errors(true);
-        $dom = new \DOMDocument();
+        $dom = new \DOMDocument;
         $dom->loadXML($content);
         libxml_clear_errors();
 
-        $codes = [];
         $xpath = new \DOMXPath($dom);
         $xpath->registerNamespace('svg', 'http://www.w3.org/2000/svg');
-        $nodes = $xpath->query('//*[local-name()="text" or local-name()="tspan"]');
 
-        $regex = '/^[A-Z]+\d{2}$/';
-        foreach ($nodes as $node) {
+        $uniqueByFull = [];
+
+        foreach ($xpath->query('//*[local-name()="text" or local-name()="tspan"]') as $node) {
             $text = trim($node->textContent ?? '');
-            if ($text !== '' && preg_match($regex, $text)) {
-                $codes[$text] = true;
+            if ($text === '') {
+                continue;
+            }
+            $parsed = Device::parseSvgLabel($text);
+            if ($parsed) {
+                $uniqueByFull[$parsed['full_code']] = $parsed;
             }
         }
 
-        $count = 0;
-        foreach (array_keys($codes) as $code) {
-            $this->seats()->firstOrCreate(
-                ['code' => $code],
-                ['code' => $code]
-            );
-            $count++;
+        foreach ($xpath->query('//*[local-name()="foreignObject"]//*') as $node) {
+            if (! $node instanceof \DOMElement) {
+                continue;
+            }
+            if ($node->getElementsByTagName('*')->length > 0) {
+                continue;
+            }
+            $text = trim($node->textContent ?? '');
+            if ($text === '') {
+                continue;
+            }
+            $parsed = Device::parseSvgLabel($text);
+            if ($parsed) {
+                $uniqueByFull[$parsed['full_code']] = $parsed;
+            }
         }
 
-        return $count;
+        /** Dispositivos únicos neste SVG (chave no banco: network_map_id + type + code). Não usamos isto para apagar linhas antigas. */
+        $foundDevices = array_values($uniqueByFull);
+
+        foreach ($foundDevices as $parsed) {
+            $this->devices()->firstOrCreate(
+                [
+                    'network_map_id' => $this->id,
+                    'type' => $parsed['type'],
+                    'code' => $parsed['code'],
+                ],
+                [
+                    'full_code' => $parsed['full_code'],
+                ]
+            );
+        }
+
+        return count($foundDevices);
     }
 }

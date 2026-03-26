@@ -644,6 +644,10 @@
         </div>
     </div>
 
+    @if(!empty($extensionListSvgUrl))
+        @include('partials.extension-list-home', ['extensionListSvgUrl' => $extensionListSvgUrl])
+    @endif
+
     <style>
         /* Grid personalizado para cards com altura uniforme */
         .cards-grid {

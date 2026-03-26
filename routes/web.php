@@ -22,6 +22,9 @@ use App\Http\Controllers\Admin\BranchController as AdminBranchController;
 use App\Http\Controllers\Admin\StandardWeightProfileController as AdminStandardWeightProfileController;
 use App\Http\Controllers\CameraController;
 use App\Http\Controllers\FormController;
+use App\Http\Controllers\FiliaisController;
+use App\Http\Controllers\ExtensionListDocumentController;
+use App\Http\Controllers\Admin\ExtensionListController;
 
 // Formulários públicos (anônimos, sem layout do sistema)
 Route::middleware(['throttle:30,1'])->prefix('formulario')->name('form.')->group(function () {
@@ -61,6 +64,11 @@ Route::get('/test-permissions', function () {
 Route::get('/test-modal-click', function () {
     return view('test-modal-click');
 })->name('test-modal-click');
+
+// Lista de ramais (SVG) — apenas autenticados
+Route::middleware(['auth.any'])->group(function () {
+    Route::get('/lista-ramais/documento', [ExtensionListDocumentController::class, 'show'])->name('extension-list.document');
+});
 
 // Rotas para favoritos (protegidas por autenticação)
 Route::middleware(['auth.any'])->prefix('favorites')->name('favorites.')->group(function () {
@@ -122,9 +130,9 @@ Route::middleware(['auth.any', 'admin.access'])->prefix('admin')->name('admin.')
     // Mapas de Rede
     Route::resource('network-maps', NetworkMapController::class);
     Route::post('network-maps/{networkMap}/toggle-status', [NetworkMapController::class, 'toggleStatus'])->name('network-maps.toggle-status');
-    Route::get('network-maps/{network_map}/seats/{code}', [NetworkMapController::class, 'getSeat'])->name('network-maps.seats.get');
-    Route::put('network-maps/{network_map}/seats/{code}', [NetworkMapController::class, 'updateSeat'])->name('network-maps.seats.update');
-    Route::post('network-maps/{network_map}/resync-seats', [NetworkMapController::class, 'resyncSeats'])->name('network-maps.resync-seats');
+    Route::get('network-maps/{network_map}/devices/{type}/{code}', [NetworkMapController::class, 'getDevice'])->name('network-maps.devices.get');
+    Route::put('network-maps/{network_map}/devices/{type}/{code}', [NetworkMapController::class, 'updateDevice'])->name('network-maps.devices.update');
+    Route::post('network-maps/{network_map}/resync-devices', [NetworkMapController::class, 'resyncDevices'])->name('network-maps.resync-devices');
     
     // Mesas (Seats)
     Route::resource('seats', SeatController::class);
@@ -176,6 +184,10 @@ Route::middleware(['auth.any', 'admin.access'])->prefix('admin')->name('admin.')
     Route::post('/forms/{form}/standard-weight-profiles', [AdminStandardWeightProfileController::class, 'store'])->name('forms.standard-weight-profiles.store');
     Route::delete('/forms/{form}/standard-weight-profiles/{profile}', [AdminStandardWeightProfileController::class, 'destroy'])->name('forms.standard-weight-profiles.destroy');
 
+    // Lista de ramais (cadastro SVG)
+    Route::get('/extension-list', [ExtensionListController::class, 'index'])->name('extension-list.index');
+    Route::post('/extension-list', [ExtensionListController::class, 'update'])->name('extension-list.update');
+
     // Filiais (para formulários)
     Route::get('/branches', [AdminBranchController::class, 'index'])->name('branches.index');
     Route::post('/branches', [AdminBranchController::class, 'store'])->name('branches.store');
@@ -201,6 +213,12 @@ Route::middleware(['auth.any', 'admin.access'])->prefix('admin')->name('admin.')
         
         return response()->json($data);
     });
+});
+
+// Filiais — visualização dos mapas de rede ativos (mesmo layout do mapa admin)
+Route::middleware(['auth.any'])->prefix('filiais')->name('filiais.')->group(function () {
+    Route::get('/', [FiliaisController::class, 'index'])->name('index');
+    Route::get('/network-maps/{network_map}/devices/{type}/{code}', [FiliaisController::class, 'getDevice'])->name('network-maps.devices.get');
 });
 
 // Rotas de câmeras (checklists operacionais)

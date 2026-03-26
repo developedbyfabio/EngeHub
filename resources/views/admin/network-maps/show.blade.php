@@ -1,29 +1,66 @@
 @extends('layouts.app')
 
+@php
+    $filiaisMode = $filiaisMode ?? false;
+    $canEditDevicesEffective = $canEditDevices ?? true;
+@endphp
+
 @section('header')
     <div class="flex justify-between items-center">
         <h2 class="font-semibold text-xl text-gray-800 leading-tight">
             <i class="fas fa-map-marked-alt mr-2" style="color: #E9B32C;"></i>
-            {{ $network_map->name }}
+            {{ $filiaisMode ? 'Filiais' : $network_map->name }}
         </h2>
-        <div class="flex items-center gap-2">
-            <a href="{{ route('admin.network-maps.edit', $network_map) }}" class="inline-flex items-center px-4 py-2 btn-engehub-yellow border border-transparent rounded-md font-semibold text-xs uppercase tracking-widest transition">
-                <i class="fas fa-edit mr-2"></i>
-                Editar
-            </a>
-            <a href="{{ route('admin.network-maps.index') }}" class="inline-flex items-center px-4 py-2 bg-gray-200 border border-gray-300 rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest hover:bg-gray-300 transition">
-                <i class="fas fa-arrow-left mr-2"></i>
-                Voltar
-            </a>
+        <div class="flex flex-wrap items-center justify-end gap-2">
+            @if($filiaisMode && $svgContent)
+                <button type="button" id="filiaisOpenFullscreenBtn" class="inline-flex items-center justify-center gap-2 rounded-md border-2 border-gray-800 bg-gray-900 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white shadow-sm transition hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2">
+                    <i class="fas fa-expand-alt"></i> Tela cheia
+                </button>
+            @endif
+            @if($filiaisMode)
+                <a href="{{ route('admin.network-maps.index') }}" class="inline-flex items-center px-4 py-2 btn-engehub-yellow border border-transparent rounded-md font-semibold text-xs uppercase tracking-widest transition">
+                    <i class="fas fa-cog mr-2"></i> Gerenciar Mapas de Rede
+                </a>
+            @else
+                <a href="{{ route('admin.network-maps.edit', $network_map) }}" class="inline-flex items-center px-4 py-2 btn-engehub-yellow border border-transparent rounded-md font-semibold text-xs uppercase tracking-widest transition">
+                    <i class="fas fa-edit mr-2"></i> Editar
+                </a>
+                <a href="{{ route('admin.network-maps.index') }}" class="inline-flex items-center px-4 py-2 bg-gray-200 border border-gray-300 rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest hover:bg-gray-300 transition">
+                    <i class="fas fa-arrow-left mr-2"></i> Voltar
+                </a>
+            @endif
         </div>
     </div>
 @endsection
 
 @section('content')
+    @if($filiaisMode)
+    <script>
+        window.filiaisNavigateMap = function (selectEl) {
+            if (!selectEl || selectEl.value === '') return;
+            var fromFs = selectEl.getAttribute('data-filiais-context') === 'fullscreen';
+            var url = @json(route('filiais.index')) + '?map=' + encodeURIComponent(selectEl.value);
+            if (fromFs) url += '&fs=1';
+            window.location.href = url;
+        };
+    </script>
+    @endif
+
     <div class="py-12">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6">
+                    @if($filiaisMode && isset($maps) && $maps->count() > 1)
+                        <div class="mb-6 flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:gap-4">
+                            @include('filiais.partials.map-select-filter', [
+                                'maps' => $maps,
+                                'selectedMapId' => $network_map->id,
+                                'prefix' => '',
+                                'compact' => false,
+                                'context' => 'main',
+                            ])
+                        </div>
+                    @endif
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                         <div class="bg-gray-50 rounded-lg p-4">
                             <div class="text-sm text-gray-500">Arquivo</div>
@@ -39,22 +76,36 @@
                         </div>
                         <div class="bg-gray-50 rounded-lg p-4 flex items-center justify-between gap-2">
                             <div>
-                                <div class="text-sm text-gray-500">Mesas cadastradas</div>
-                                <div class="font-medium text-gray-900" id="seatCount">{{ $network_map->seats->count() }}</div>
+                                <div class="text-sm text-gray-500">Dispositivos no mapa</div>
+                                <div class="font-medium text-gray-900" id="deviceCount">{{ $network_map->devices->count() }}</div>
                             </div>
-                            <form action="{{ route('admin.network-maps.resync-seats', $network_map) }}" method="POST" class="inline" onsubmit="return confirm('Revarredurar o SVG e sincronizar as mesas?');">
-                                @csrf
-                                <button type="submit" class="inline-flex items-center px-3 py-1.5 bg-gray-200 border border-gray-300 rounded text-xs font-medium text-gray-700 hover:bg-gray-300 transition">
-                                    <i class="fas fa-sync-alt mr-1"></i> Revarrear mesas
-                                </button>
-                            </form>
+                            @if(!$filiaisMode)
+                                <form action="{{ route('admin.network-maps.resync-devices', $network_map) }}" method="POST" class="inline" onsubmit="return confirm('Varredura do SVG e sincronização de dispositivos?');">
+                                    @csrf
+                                    <button type="submit" class="inline-flex items-center px-3 py-1.5 bg-gray-200 border border-gray-300 rounded text-xs font-medium text-gray-700 hover:bg-gray-300 transition">
+                                        <i class="fas fa-sync-alt mr-1"></i> Revarrear dispositivos
+                                    </button>
+                                </form>
+                            @endif
                         </div>
                     </div>
 
                     @if($svgContent)
+                        @if($filiaisMode)
+                            <div id="filiaisMapOriginalParent">
+                        @endif
                         <div class="mapa-rede-forcelight border-2 border-gray-300 rounded-lg overflow-hidden shadow-inner relative" style="height: 70vh; background: #ffffff !important;">
-                            {{-- Controles flutuantes: rótulos no mapa + zoom (canto superior direito) --}}
-                            <div class="absolute top-3 right-3 z-10 flex flex-wrap items-center gap-2">
+                            @include('admin.network-maps.partials.map-layer-filters')
+                            <div class="absolute top-3 right-3 z-30 flex flex-wrap items-center justify-end gap-2 max-w-[calc(100%-1rem)] pointer-events-auto" role="toolbar" aria-label="Controles do mapa">
+                                <div class="flex flex-wrap items-center gap-1.5 rounded-lg bg-white/95 shadow-lg border border-gray-200 p-1.5 backdrop-blur-sm" role="search" aria-label="Buscar colaborador no mapa">
+                                    <input type="search" id="mapCollaboratorSearch" name="map_collaborator_search" placeholder="Buscar colaborador…" autocomplete="off" class="text-sm rounded-md border border-gray-300 px-2 py-1.5 w-36 sm:w-44 min-w-0 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-1 focus:ring-amber-500">
+                                    <div id="mapSearchNav" class="hidden flex items-center gap-0.5 shrink-0">
+                                        <button type="button" id="mapSearchPrev" class="w-8 h-8 flex items-center justify-center rounded-md bg-gray-100 hover:bg-gray-200 text-gray-800 text-lg font-semibold leading-none" title="Resultado anterior">&lsaquo;</button>
+                                        <span id="mapSearchStatus" class="text-xs text-gray-800 font-semibold px-1 min-w-[5.5rem] text-center tabular-nums"></span>
+                                        <button type="button" id="mapSearchNext" class="w-8 h-8 flex items-center justify-center rounded-md bg-gray-100 hover:bg-gray-200 text-gray-800 text-lg font-semibold leading-none" title="Próximo resultado">&rsaquo;</button>
+                                    </div>
+                                    <span id="mapSearchFeedback" class="hidden text-xs text-amber-800 max-w-[12rem] leading-tight"></span>
+                                </div>
                                 <div class="flex items-center gap-1.5 rounded-lg bg-white/95 shadow-lg border border-gray-200 p-1.5 backdrop-blur-sm" role="group" aria-label="Rótulos no mapa">
                                     <button type="button" id="mapShowCodes" class="px-2.5 py-1.5 rounded-md text-sm font-medium border border-gray-400 btn-engehub-yellow transition-colors">Códigos</button>
                                     <button type="button" id="mapShowNames" class="px-2.5 py-1.5 rounded-md text-sm font-medium border border-gray-300 bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">Nomes</button>
@@ -66,14 +117,18 @@
                                     <button type="button" id="mapZoomReset" class="px-2.5 py-1.5 text-sm font-medium rounded-md btn-engehub-yellow transition-colors" title="Resetar zoom">Reset</button>
                                 </div>
                             </div>
-                            <div id="mapaContainer" class="w-full h-full overflow-hidden cursor-grab" style="touch-action: none; background: #ffffff !important;">
+                            <div id="mapaContainer" class="relative z-0 w-full h-full overflow-hidden cursor-grab" style="touch-action: none; background: #ffffff !important;">
                                 <div id="svgWrapper" class="inline-block p-4" style="transform-origin: 0 0; will-change: transform; background: #ffffff;">
                                     <div id="svgContainer" class="svg-map-theme" style="background: #ffffff !important;">
                                         {!! $svgContent !!}
                                     </div>
                                 </div>
                             </div>
+                            @include('admin.network-maps.partials.device-side-panel')
                         </div>
+                        @if($filiaisMode)
+                            </div>
+                        @endif
                     @else
                         <div class="text-center py-12 bg-gray-50 rounded-lg">
                             <i class="fas fa-file-alt text-4xl text-gray-400 mb-4"></i>
@@ -86,459 +141,161 @@
         </div>
     </div>
 
-    {{-- Modal Visualizar Mesa (só leitura + botão Editar) --}}
-    <div id="seatViewModal" class="fixed inset-0 z-[99999] flex items-center justify-center p-4" aria-modal="true" style="display: none;">
-        <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onclick="closeSeatViewModal()" aria-hidden="true"></div>
-        <div class="relative bg-white rounded-xl shadow-2xl flex flex-col max-h-[85vh] w-full mx-auto my-auto" style="width: 100%; max-width: 28rem;" onclick="event.stopPropagation()">
-            <div class="p-5 border-b border-gray-200 shrink-0 flex justify-between items-center rounded-t-xl">
-                <h3 class="text-lg font-semibold text-gray-900">Mesa — <span id="seatViewCode"></span></h3>
-                <button type="button" onclick="closeSeatViewModal()" class="p-1 text-gray-400 hover:text-gray-600 rounded"><i class="fas fa-times text-xl"></i></button>
-            </div>
-            <div class="p-5 overflow-y-auto flex-1 min-h-0 text-sm" id="seatViewContent">
-                <div class="text-center py-4"><div class="animate-spin rounded-full h-8 w-8 border-2 border-amber-500 border-t-transparent mx-auto"></div><p class="mt-2 text-gray-600">Carregando...</p></div>
-            </div>
-            <div class="p-5 border-t border-gray-200 flex justify-end gap-2 shrink-0 rounded-b-xl">
-                <button type="button" onclick="closeSeatViewModal()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300">Fechar</button>
-                <button type="button" id="seatViewEditBtn" class="px-4 py-2 btn-engehub-yellow rounded-lg font-medium"><i class="fas fa-edit mr-2"></i>Editar</button>
+    @if($filiaisMode && $svgContent)
+        <div id="filiaisFullscreenModal" class="filiais-fs-modal fixed inset-0 z-[200] items-center justify-center bg-black/55 p-3 sm:p-5 md:p-6" role="dialog" aria-modal="true" aria-labelledby="filiaisFullscreenTitle">
+            <div class="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-[calc(100vw-1.5rem)] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl">
+                <div class="flex w-full flex-wrap items-center gap-x-2 gap-y-2 border-b border-gray-200 bg-gray-50 px-3 py-2 sm:px-4">
+                    <h2 id="filiaisFullscreenTitle" class="flex flex-shrink-0 items-center text-sm font-bold text-gray-900 sm:text-base">
+                        <i class="fas fa-map-marked-alt mr-1.5 text-amber-600 sm:mr-2"></i> Filiais — tela cheia
+                    </h2>
+                    @if(isset($maps) && $maps->count() > 1)
+                        <div class="flex min-w-0 flex-1 flex-wrap items-center justify-center px-1">
+                            @include('filiais.partials.map-select-filter', ['maps' => $maps, 'selectedMapId' => $network_map->id, 'prefix' => 'fs_', 'compact' => true, 'context' => 'fullscreen'])
+                        </div>
+                    @else
+                        <div class="min-w-0 flex-1"></div>
+                    @endif
+                    <div class="flex flex-shrink-0 items-center sm:ml-auto">
+                        <button type="button" id="filiaisCloseFullscreenBtn" class="inline-flex items-center gap-1.5 rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-800 sm:px-4">
+                            <i class="fas fa-times"></i> Fechar
+                        </button>
+                    </div>
+                </div>
+                <div id="filiaisFullscreenMapHost" class="filiais-fs-map-host min-h-0 flex-1 overflow-hidden bg-white p-2 sm:p-3"></div>
             </div>
         </div>
-    </div>
+    @endif
 
-    {{-- Modal Editar Mesa (centralizado na tela) --}}
-    <div id="seatEditModal" class="fixed inset-0 z-[99999] flex items-center justify-center p-4" aria-modal="true" style="display: none;">
-        <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onclick="closeSeatEditModal()" aria-hidden="true"></div>
-        <div class="relative bg-white rounded-xl shadow-2xl flex flex-col w-full mx-auto my-auto" style="z-index: 1; max-width: 42rem; max-height: 85vh; min-height: 0;" onclick="event.stopPropagation()">
-                <div class="p-6 border-b border-gray-200 shrink-0">
-                    <h3 class="text-lg font-semibold text-gray-900">Editar mesa — <span id="seatEditCode"></span></h3>
-                </div>
-                <div class="overflow-y-auto flex-1 min-h-0">
-                <form id="seatEditForm" class="p-6 space-y-4">
-                    <input type="hidden" name="code" id="seatEditCodeInput">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Código</label>
-                        <input type="text" id="seatEditCodeReadonly" readonly class="w-full rounded border-gray-300 bg-gray-100 text-gray-700">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Setor</label>
-                        <input type="text" name="setor" id="seatEditSetor" class="w-full rounded border-gray-300" maxlength="100" placeholder="Ex: TI">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Observações</label>
-                        <textarea name="observacoes" id="seatEditObservacoes" class="w-full rounded border-gray-300" rows="2" maxlength="500" placeholder="Opcional"></textarea>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Colaborador (nome exibido no mapa)</label>
-                        <input type="text" name="collaborator_name" id="seatEditCollaboratorName" class="w-full rounded border-gray-300" maxlength="255" placeholder="Ex: Fabio Henrique (digite o nome; no mapa o código será substituído por este nome)">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Nome do computador</label>
-                        <input type="text" name="computer_name" id="seatEditComputerName" class="w-full rounded border-gray-300" maxlength="100" placeholder="Opcional">
-                    </div>
-                    <div class="border-t pt-4 mt-4">
-                        <h4 class="font-medium text-gray-800 mb-2">Ponto de rede 1</h4>
-                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                            <div>
-                                <label class="block text-xs text-gray-600 mb-0.5">Código</label>
-                                <input type="text" name="point_1_code" id="seatEditPoint1Code" class="w-full rounded border-gray-300 text-sm" maxlength="20">
-                            </div>
-                            <div>
-                                <label class="block text-xs text-gray-600 mb-0.5">IP</label>
-                                <input type="text" name="point_1_ip" id="seatEditPoint1Ip" class="w-full rounded border-gray-300 text-sm" maxlength="45">
-                            </div>
-                            <div>
-                                <label class="block text-xs text-gray-600 mb-0.5">MAC</label>
-                                <input type="text" name="point_1_mac" id="seatEditPoint1Mac" class="w-full rounded border-gray-300 text-sm" maxlength="50">
-                            </div>
-                        </div>
-                    </div>
-                    <div>
-                        <h4 class="font-medium text-gray-800 mb-2">Ponto de rede 2</h4>
-                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                            <div>
-                                <label class="block text-xs text-gray-600 mb-0.5">Código</label>
-                                <input type="text" name="point_2_code" id="seatEditPoint2Code" class="w-full rounded border-gray-300 text-sm" maxlength="20">
-                            </div>
-                            <div>
-                                <label class="block text-xs text-gray-600 mb-0.5">IP</label>
-                                <input type="text" name="point_2_ip" id="seatEditPoint2Ip" class="w-full rounded border-gray-300 text-sm" maxlength="45">
-                            </div>
-                            <div>
-                                <label class="block text-xs text-gray-600 mb-0.5">MAC</label>
-                                <input type="text" name="point_2_mac" id="seatEditPoint2Mac" class="w-full rounded border-gray-300 text-sm" maxlength="50">
-                            </div>
-                        </div>
-                    </div>
-                </form>
-                </div>
-                <div class="p-6 border-t border-gray-200 flex justify-end gap-2 shrink-0">
-                    <button type="button" onclick="closeSeatEditModal()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded font-medium hover:bg-gray-300">Cancelar</button>
-                    <button type="submit" form="seatEditForm" class="px-4 py-2 btn-engehub-yellow rounded font-medium">Atualizar</button>
-                </div>
-            </div>
-        </div>
-    </div>
+    @include('admin.network-maps.partials.device-modals', ['canEditDevicesEffective' => $canEditDevicesEffective])
 
     <style>
-        /* Botão amarelo padrão (mesma cor do header do usuário #E9B32C) */
         .btn-engehub-yellow { background-color: #E9B32C !important; color: #000 !important; }
         .btn-engehub-yellow:hover { background-color: #d19d20 !important; }
-        #seatEditModal { align-items: center; justify-content: center; }
-        #seatEditModal .relative.bg-white { max-height: 85vh; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
-        #seatEditModal .relative.bg-white > div.overflow-y-auto { -webkit-overflow-scrolling: touch; }
-        /* Forçar visual correto em qualquer tema: tratar mapa como color-scheme dark (igual tema escuro) + fundo branco */
-        .mapa-rede-forcelight { color-scheme: dark !important; background: #ffffff !important; isolation: isolate; contain: layout style paint; }
+        .device-modal { align-items: center; justify-content: center; }
+        #deviceSeatEditModal .relative.bg-white { max-height: 85vh; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+        .mapa-rede-forcelight { color-scheme: dark !important; background: #ffffff !important; isolation: isolate; contain: layout style; }
         .mapa-rede-forcelight #mapaContainer, .mapa-rede-forcelight #svgContainer, .mapa-rede-forcelight #svgWrapper { background: #ffffff !important; }
         .mapa-rede-forcelight .svg-map-theme svg { background-color: #ffffff !important; }
-        /* Não forçar fill/color em todo texto: preservar cores do draw.io (ex.: laranja em "RH", "PRESIDÊNCIA"). Só forçar preto nos rótulos de mesa (data-seat). */
-        .mapa-rede-forcelight .svg-map-theme [data-seat].seat { fill: #000000 !important; color: #000000 !important; }
-        .mapa-rede-forcelight .svg-map-theme foreignObject [data-seat].seat { color: #000000 !important; }
+        .mapa-rede-forcelight .svg-map-theme [data-code].device { fill: #000000 !important; color: #000000 !important; }
+        .mapa-rede-forcelight .svg-map-theme foreignObject [data-code].device { color: #000000 !important; }
         @media (prefers-color-scheme: light) {
             .mapa-rede-forcelight, .mapa-rede-forcelight * { color-scheme: dark !important; }
             .mapa-rede-forcelight .svg-map-theme svg { background: #ffffff !important; background-color: #ffffff !important; }
         }
-        /* Não forçar stroke preto em path/line/polyline/rect para preservar cores do draw.io (ex.: borda laranja nas mesas) */
-        .svg-map-theme [data-seat].seat { cursor: pointer !important; }
-        .svg-map-theme [data-seat].seat:hover { fill: #b45309 !important; }
-        .svg-map-theme foreignObject [data-seat].seat:hover { color: #b45309 !important; }
-        /* Não usar pointer-events: none no SVG: senão o clique cai no container e vira arraste */
+        .svg-map-theme [data-code].device { cursor: pointer !important; }
+        .svg-map-theme [data-code].device:hover { fill: #b45309 !important; }
+        .svg-map-theme foreignObject [data-code].device:hover { color: #b45309 !important; }
+        .svg-map-theme .device.device-search-highlight {
+            filter: drop-shadow(0 0 3px #E9B32C) drop-shadow(0 0 6px rgba(233, 179, 44, 0.85));
+            transition: filter 0.35s ease;
+        }
+        .svg-map-theme foreignObject .device.device-search-highlight {
+            box-shadow: 0 0 0 2px #E9B32C, 0 0 12px rgba(233, 179, 44, 0.6);
+            transition: box-shadow 0.35s ease;
+        }
+        .svg-map-theme .device.map-layer-filter-hidden {
+            visibility: hidden !important;
+            pointer-events: none !important;
+        }
+        .svg-map-theme foreignObject .device.map-layer-filter-hidden {
+            visibility: hidden !important;
+            pointer-events: none !important;
+        }
         #mapaContainer svg { max-width: none !important; height: auto !important; }
+        .filiais-fs-map-host { display: flex; flex-direction: column; }
+        .mapa-rede-forcelight.filiais-map-fullscreen-panel { flex: 1; min-height: 0; height: 100% !important; }
+        #deviceSidePanel.map-device-panel {
+            position: absolute;
+            right: 0.75rem;
+            top: 4.25rem;
+            bottom: 0.75rem;
+            width: min(22rem, 36vw);
+            min-width: 280px;
+            max-width: 400px;
+            z-index: 25;
+            border-radius: 0.75rem;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.14);
+            border: 1px solid #e5e7eb;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateX(10px);
+            transition: opacity 0.28s ease, transform 0.28s ease, visibility 0.28s;
+            pointer-events: none;
+        }
+        #deviceSidePanel.map-device-panel.map-device-panel--open {
+            opacity: 1;
+            visibility: visible;
+            transform: translateX(0);
+            pointer-events: auto;
+        }
+        @media (max-width: 640px) {
+            #deviceSidePanel.map-device-panel {
+                width: min(20rem, calc(100vw - 4rem));
+                min-width: 0;
+                right: 0.5rem;
+            }
+        }
     </style>
 
     @if($svgContent)
     <script>
+    @include('admin.network-maps.partials.network-map-devices-script', [
+        'network_map' => $network_map,
+        'filiaisMode' => $filiaisMode ?? false,
+        'canEditDevicesEffective' => $canEditDevicesEffective,
+        'deviceLabels' => $deviceLabels ?? [],
+    ])
+    </script>
+    @endif
+
+    @if($filiaisMode && $svgContent)
+    <script>
     (function() {
-        var networkMapId = {{ $network_map->id }};
-        var seatGetUrl = "{{ url('admin/network-maps/'.$network_map->id) }}/seats/";
-        var seatUpdateUrl = "{{ url('admin/network-maps/'.$network_map->id) }}/seats/";
-        var csrfToken = "{{ csrf_token() }}";
-        var seatLabels = @json($seatLabels ?? []);
+        var modal = document.getElementById('filiaisFullscreenModal');
+        var host = document.getElementById('filiaisFullscreenMapHost');
+        var parent = document.getElementById('filiaisMapOriginalParent');
+        var openBtn = document.getElementById('filiaisOpenFullscreenBtn');
+        var closeBtn = document.getElementById('filiaisCloseFullscreenBtn');
+        if (!modal || !host || !parent || !openBtn || !closeBtn) return;
 
-        var mapZoomLevel = 1, mapTranslateX = 0, mapTranslateY = 0;
-        var mapPanStartX, mapPanStartY, mapPanStartTranslateX, mapPanStartTranslateY, mapPanning = false;
-        var mapShowNames = false;
-
-        var mapRAF = null;
-        function mapApplyTransform() {
-            var w = document.getElementById('svgWrapper');
-            if (!w) return;
-            w.style.transform = 'translate(' + mapTranslateX + 'px, ' + mapTranslateY + 'px) scale(' + mapZoomLevel + ')';
+        function getMapPanel() {
+            return parent.querySelector('.mapa-rede-forcelight') || host.querySelector('.mapa-rede-forcelight');
         }
-        function mapScheduleTransform() {
-            if (mapRAF !== null) return;
-            mapRAF = requestAnimationFrame(function() {
-                mapRAF = null;
-                mapApplyTransform();
-            });
+        function openFiliaisMapFullscreen() {
+            var mapEl = getMapPanel();
+            if (!mapEl) return;
+            host.appendChild(mapEl);
+            mapEl.classList.add('filiais-map-fullscreen-panel');
+            modal.classList.add('filiais-fs-open');
+            document.body.classList.add('overflow-hidden');
         }
-        /** Zoom centralizado no ponto (clientX, clientY). Se não passar coordenadas, usa o centro do container. */
-        function mapZoomAtPoint(clientX, clientY, zoomIn) {
-            var container = document.getElementById('mapaContainer');
-            var rect = container ? container.getBoundingClientRect() : null;
-            var mouseX = rect ? (clientX - rect.left) : 0;
-            var mouseY = rect ? (clientY - rect.top) : 0;
-            var newScale = zoomIn ? Math.min(5, mapZoomLevel + 0.25) : Math.max(0.25, mapZoomLevel - 0.25);
-            if (newScale === mapZoomLevel) return;
-            var contentX = (mouseX - mapTranslateX) / mapZoomLevel;
-            var contentY = (mouseY - mapTranslateY) / mapZoomLevel;
-            mapTranslateX = mouseX - contentX * newScale;
-            mapTranslateY = mouseY - contentY * newScale;
-            mapZoomLevel = newScale;
-            mapApplyTransform();
-            var el = document.getElementById('zoomLevel');
-            if (el) el.textContent = Math.round(mapZoomLevel * 100) + '%';
+        function closeFiliaisMapFullscreen() {
+            var mapEl = getMapPanel();
+            if (!mapEl) return;
+            parent.appendChild(mapEl);
+            mapEl.classList.remove('filiais-map-fullscreen-panel');
+            modal.classList.remove('filiais-fs-open');
+            document.body.classList.remove('overflow-hidden');
         }
-        function mapZoomIn() {
-            var container = document.getElementById('mapaContainer');
-            if (container) {
-                var r = container.getBoundingClientRect();
-                mapZoomAtPoint(r.left + r.width / 2, r.top + r.height / 2, true);
-            } else {
-                mapZoomLevel = Math.min(5, mapZoomLevel + 0.25);
-                mapApplyTransform();
-                var el = document.getElementById('zoomLevel');
-                if (el) el.textContent = Math.round(mapZoomLevel * 100) + '%';
-            }
-        }
-        function mapZoomOut() {
-            var container = document.getElementById('mapaContainer');
-            if (container) {
-                var r = container.getBoundingClientRect();
-                mapZoomAtPoint(r.left + r.width / 2, r.top + r.height / 2, false);
-            } else {
-                mapZoomLevel = Math.max(0.25, mapZoomLevel - 0.25);
-                mapApplyTransform();
-                var el = document.getElementById('zoomLevel');
-                if (el) el.textContent = Math.round(mapZoomLevel * 100) + '%';
-            }
-        }
-        function mapResetZoom() {
-            mapZoomLevel = 1;
-            mapTranslateX = 0;
-            mapTranslateY = 0;
-            mapApplyTransform();
-            var el = document.getElementById('zoomLevel');
-            if (el) el.textContent = '100%';
-        }
-
-        function applySeatLabels() {
-            var container = document.getElementById('svgContainer');
-            if (!container) return;
-            [].forEach.call(container.querySelectorAll('[data-seat]'), function(el) {
-                var code = el.getAttribute('data-seat');
-                var original = el.getAttribute('data-original-text') || code;
-                var text = mapShowNames && seatLabels[code] ? seatLabels[code] : original;
-                el.textContent = text;
-            });
-        }
-        function setLabelToggle(showNames) {
-            mapShowNames = showNames;
-            var btnCodes = document.getElementById('mapShowCodes');
-            var btnNames = document.getElementById('mapShowNames');
-            if (btnCodes && btnNames) {
-                if (showNames) {
-                    btnCodes.classList.remove('btn-engehub-yellow', 'border-gray-400');
-                    btnCodes.classList.add('bg-gray-100', 'text-gray-700', 'border-gray-300');
-                    btnNames.classList.remove('bg-gray-100', 'text-gray-700', 'border-gray-300');
-                    btnNames.classList.add('btn-engehub-yellow', 'border-gray-400');
-                } else {
-                    btnNames.classList.remove('btn-engehub-yellow', 'border-gray-400');
-                    btnNames.classList.add('bg-gray-100', 'text-gray-700', 'border-gray-300');
-                    btnCodes.classList.remove('bg-gray-100', 'text-gray-700', 'border-gray-300');
-                    btnCodes.classList.add('btn-engehub-yellow', 'border-gray-400');
-                }
-            }
-            applySeatLabels();
-        }
-
-        function openSeatEditModal(code) {
-            var modal = document.getElementById('seatEditModal');
-            var codeEl = document.getElementById('seatEditCode');
-            var codeReadonly = document.getElementById('seatEditCodeReadonly');
-            var codeInput = document.getElementById('seatEditCodeInput');
-            if (!modal || !codeEl) return;
-            codeEl.textContent = code;
-            codeReadonly.value = code;
-            codeInput.value = code;
-            modal.style.display = 'flex';
-            modal.classList.remove('hidden');
-            document.getElementById('seatEditSetor').value = '';
-            document.getElementById('seatEditObservacoes').value = '';
-            document.getElementById('seatEditCollaboratorName').value = '';
-            document.getElementById('seatEditComputerName').value = '';
-            document.getElementById('seatEditPoint1Code').value = code + '-01';
-            document.getElementById('seatEditPoint1Ip').value = '';
-            document.getElementById('seatEditPoint1Mac').value = '';
-            document.getElementById('seatEditPoint2Code').value = code + '-02';
-            document.getElementById('seatEditPoint2Ip').value = '';
-            document.getElementById('seatEditPoint2Mac').value = '';
-
-            fetch(seatGetUrl + encodeURIComponent(code), { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
-                .then(function(r) { return r.json(); })
-                .then(function(data) {
-                    if (!data.success || !data.seat) return;
-                    var s = data.seat;
-                    document.getElementById('seatEditSetor').value = s.setor || '';
-                    document.getElementById('seatEditObservacoes').value = s.observacoes || '';
-                    if (s.current_assignment) {
-                        document.getElementById('seatEditCollaboratorName').value = s.current_assignment.collaborator_name || '';
-                        document.getElementById('seatEditComputerName').value = s.current_assignment.computer_name || '';
-                    }
-                    var pts = s.network_points || [];
-                    if (pts[0]) {
-                        document.getElementById('seatEditPoint1Code').value = pts[0].code || '';
-                        document.getElementById('seatEditPoint1Ip').value = pts[0].ip || '';
-                        document.getElementById('seatEditPoint1Mac').value = pts[0].mac_address || '';
-                    }
-                    if (pts[1]) {
-                        document.getElementById('seatEditPoint2Code').value = pts[1].code || '';
-                        document.getElementById('seatEditPoint2Ip').value = pts[1].ip || '';
-                        document.getElementById('seatEditPoint2Mac').value = pts[1].mac_address || '';
-                    }
-                })
-                .catch(function() {});
-        }
-        function closeSeatEditModal() {
-            var modal = document.getElementById('seatEditModal');
-            if (modal) {
-                modal.style.display = 'none';
-                modal.classList.add('hidden');
-            }
-        }
-
-        function openSeatViewModal(code) {
-            var modal = document.getElementById('seatViewModal');
-            var codeEl = document.getElementById('seatViewCode');
-            var content = document.getElementById('seatViewContent');
-            var editBtn = document.getElementById('seatViewEditBtn');
-            if (!modal || !content) return;
-            codeEl.textContent = code;
-            content.innerHTML = '<div class="text-center py-4"><div class="animate-spin rounded-full h-8 w-8 border-2 border-amber-500 border-t-transparent mx-auto"></div><p class="mt-2 text-gray-600">Carregando...</p></div>';
-            modal.style.display = 'flex';
-            editBtn.onclick = function() { closeSeatViewModal(); openSeatEditModal(code); };
-            fetch(seatGetUrl + encodeURIComponent(code), { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
-                .then(function(r) { return r.json(); })
-                .then(function(data) {
-                    if (!data.success || !data.seat) {
-                        content.innerHTML = '<p class="text-red-600">Erro ao carregar dados da mesa.</p>';
-                        return;
-                    }
-                    var s = data.seat;
-                    var html = '<div class="space-y-3 text-sm">';
-                    html += '<p><strong>Código:</strong> ' + (s.code || '-') + '</p>';
-                    if (s.setor) html += '<p><strong>Setor:</strong> ' + s.setor + '</p>';
-                    if (s.observacoes) html += '<p><strong>Observações:</strong> ' + s.observacoes + '</p>';
-                    if (s.current_assignment) {
-                        html += '<h4 class="font-semibold text-gray-800 mt-2">Colaborador</h4><ul class="list-disc list-inside text-gray-700"><li>' + (s.current_assignment.collaborator_name || '-') + '</li><li>Computador: ' + (s.current_assignment.computer_name || '-') + '</li></ul>';
-                    } else {
-                        html += '<p class="text-gray-500">Nenhum colaborador atribuído.</p>';
-                    }
-                    var pts = s.network_points || [];
-                    if (pts.length) {
-                        html += '<h4 class="font-semibold text-gray-800 mt-2">Pontos de rede</h4><table class="w-full text-sm"><thead><tr class="border-b"><th class="text-left py-1">Código</th><th class="text-left py-1">IP</th><th class="text-left py-1">MAC</th></tr></thead><tbody>';
-                        pts.forEach(function(p) { html += '<tr class="border-b"><td class="py-1">' + (p.code || '-') + '</td><td class="py-1">' + (p.ip || '-') + '</td><td class="py-1">' + (p.mac_address || '-') + '</td></tr>'; });
-                        html += '</tbody></table>';
-                    }
-                    html += '</div>';
-                    content.innerHTML = html;
-                })
-                .catch(function() { content.innerHTML = '<p class="text-red-600">Erro ao carregar. Tente novamente.</p>'; });
-        }
-        function closeSeatViewModal() {
-            var modal = document.getElementById('seatViewModal');
-            if (modal) modal.style.display = 'none';
-        }
-        window.closeSeatViewModal = closeSeatViewModal;
-
-        document.addEventListener('DOMContentLoaded', function() {
-            var container = document.getElementById('mapaContainer');
-            var wrapper = document.getElementById('svgWrapper');
-            if (container && wrapper) {
-                mapApplyTransform();
-                container.style.cursor = 'grab';
-                container.addEventListener('mousedown', function(e) {
-                    if (e.target.closest('[data-seat]')) return;
-                    e.preventDefault();
-                    e.stopPropagation();
-                    mapPanning = true;
-                    mapPanStartX = e.clientX;
-                    mapPanStartY = e.clientY;
-                    mapPanStartTranslateX = mapTranslateX;
-                    mapPanStartTranslateY = mapTranslateY;
-                    container.style.cursor = 'grabbing';
-                    container.style.userSelect = 'none';
-                }, { passive: false });
-                container.addEventListener('mousemove', function(e) {
-                    if (mapPanning) return;
-                    container.style.cursor = e.target.closest('[data-seat]') ? 'pointer' : 'grab';
-                });
-                document.addEventListener('mousemove', function(e) {
-                    if (!mapPanning) return;
-                    e.preventDefault();
-                    mapTranslateX = mapPanStartTranslateX + (e.clientX - mapPanStartX);
-                    mapTranslateY = mapPanStartTranslateY + (e.clientY - mapPanStartY);
-                    mapScheduleTransform();
-                }, { passive: false });
-                document.addEventListener('mouseup', function() {
-                    if (mapPanning) {
-                        mapPanning = false;
-                        container.style.cursor = 'grab';
-                        container.style.userSelect = '';
-                    }
-                });
-                container.addEventListener('wheel', function(e) {
-                    e.preventDefault();
-                    mapZoomAtPoint(e.clientX, e.clientY, e.deltaY < 0);
-                }, { passive: false });
-            }
-            // Clique na mesa: delegação no DOCUMENTO (capture=true) para garantir que o clique seja sempre capturado
-            document.addEventListener('click', function(e) {
-                var seatEl = e.target.closest('[data-seat]');
-                var mapa = document.getElementById('mapaContainer');
-                if (seatEl && mapa && mapa.contains(seatEl)) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    openSeatViewModal(seatEl.getAttribute('data-seat'));
-                }
-            }, true);
-            var zoomIn = document.getElementById('mapZoomIn');
-            var zoomOut = document.getElementById('mapZoomOut');
-            var zoomReset = document.getElementById('mapZoomReset');
-            var showCodes = document.getElementById('mapShowCodes');
-            var showNames = document.getElementById('mapShowNames');
-            if (zoomIn) zoomIn.addEventListener('click', mapZoomIn);
-            if (zoomOut) zoomOut.addEventListener('click', mapZoomOut);
-            if (zoomReset) zoomReset.addEventListener('click', mapResetZoom);
-            if (showCodes) showCodes.addEventListener('click', function() { setLabelToggle(false); });
-            if (showNames) showNames.addEventListener('click', function() { setLabelToggle(true); });
-
-            function initSeatClick() {
-                var svgContainer = document.getElementById('svgContainer');
-                if (!svgContainer) return;
-                var svgEl = svgContainer.querySelector('svg') || svgContainer;
-                var re = /^[A-Z]+\d{2}$/;
-                var count = 0;
-                function markIfLeaf(el) {
-                    var t = (el.textContent || '').trim();
-                    if (!re.test(t)) return;
-                    if (el.children.length > 0) return;
-                    el.setAttribute('data-seat', t);
-                    el.setAttribute('data-original-text', t);
-                    el.classList.add('seat');
-                    el.style.cursor = 'pointer';
-                    el.style.pointerEvents = 'auto';
-                    count++;
-                }
-                [].forEach.call(svgEl.querySelectorAll('text'), markIfLeaf);
-                [].forEach.call(svgEl.querySelectorAll('tspan'), markIfLeaf);
-                var foreignObjects = svgEl.querySelectorAll('foreignObject');
-                [].forEach.call(foreignObjects, function(fo) {
-                    [].forEach.call(fo.querySelectorAll('*'), markIfLeaf);
-                });
-                applySeatLabels();
-                if (count === 0) {
-                    console.warn('EngeHub mapa: nenhum texto de mesa (A01, B01...) encontrado no SVG.');
-                } else if (Object.keys(seatLabels).some(function(k) { return seatLabels[k]; })) {
-                    setLabelToggle(true);
-                }
-            }
-            initSeatClick();
-            setTimeout(initSeatClick, 200);
-
-            document.getElementById('seatEditForm').addEventListener('submit', function(e) {
-                e.preventDefault();
-                var code = document.getElementById('seatEditCodeInput').value;
-                var form = e.target;
-                var collaboratorName = (form.collaborator_name && form.collaborator_name.value) ? form.collaborator_name.value.trim() : '';
-                var payload = {
-                    setor: form.setor.value,
-                    observacoes: form.observacoes.value,
-                    collaborator_name: collaboratorName,
-                    computer_name: form.computer_name.value,
-                    point_1_code: form.point_1_code.value,
-                    point_1_ip: form.point_1_ip.value,
-                    point_1_mac: form.point_1_mac.value,
-                    point_2_code: form.point_2_code.value,
-                    point_2_ip: form.point_2_ip.value,
-                    point_2_mac: form.point_2_mac.value
-                };
-                fetch(seatUpdateUrl + encodeURIComponent(code), {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': csrfToken },
-                    body: JSON.stringify(payload)
-                }).then(function(r) { return r.json(); })
-                .then(function(data) {
-                    if (data.success) {
-                        seatLabels[code] = collaboratorName || null;
-                        setLabelToggle(true);
-                        closeSeatEditModal();
-                        if (typeof data.message !== 'undefined') alert(data.message);
-                    } else {
-                        alert(data.message || 'Erro ao atualizar.');
-                    }
-                }).catch(function() { alert('Erro ao atualizar. Tente novamente.'); });
-            });
+        openBtn.addEventListener('click', openFiliaisMapFullscreen);
+        closeBtn.addEventListener('click', closeFiliaisMapFullscreen);
+        modal.addEventListener('click', function(e) { if (e.target === modal) closeFiliaisMapFullscreen(); });
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && modal.classList.contains('filiais-fs-open')) closeFiliaisMapFullscreen();
         });
-        window.closeSeatEditModal = closeSeatEditModal;
+        document.addEventListener('DOMContentLoaded', function() {
+            var params = new URLSearchParams(window.location.search);
+            if (params.get('fs') === '1') {
+                requestAnimationFrame(function() {
+                    openFiliaisMapFullscreen();
+                    params.delete('fs');
+                    var qs = params.toString();
+                    window.history.replaceState({}, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
+                });
+            }
+        });
+        window.openFiliaisMapFullscreen = openFiliaisMapFullscreen;
+        window.closeFiliaisMapFullscreen = closeFiliaisMapFullscreen;
     })();
     </script>
     @endif

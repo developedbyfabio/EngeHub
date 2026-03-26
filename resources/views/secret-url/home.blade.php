@@ -322,23 +322,39 @@
                                     <i class="fas fa-map-marked-alt mr-2" style="color: #E9B32C;"></i>
                                     Mapa de Rede — {{ $activeNetworkMap->name }}
                                 </h2>
-                                <p class="text-gray-600 mt-1 text-sm">Clique em uma mesa para ver informações. Use os controles para zoom e arrastar.</p>
+                                <p class="text-gray-600 mt-1 text-sm">Clique em um dispositivo do mapa (mesa, impressora, TV, etc.) para ver detalhes. Use os controles para zoom e arrastar.</p>
                             </div>
                             <div class="mapa-rede-forcelight border-2 border-gray-300 rounded-lg overflow-hidden shadow-inner relative" style="height: 70vh; background: #ffffff !important;">
-                                {{-- Controles de zoom flutuantes no canto superior direito do mapa --}}
-                                <div class="absolute top-3 right-3 z-10 flex items-center gap-1.5 rounded-lg bg-white/95 shadow-lg border border-gray-200 p-1.5 backdrop-blur-sm" role="group" aria-label="Zoom do mapa">
-                                    <button type="button" onclick="typeof mapZoomOut === 'function' && mapZoomOut()" class="w-9 h-9 flex items-center justify-center rounded-md bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium text-lg transition-colors" title="Diminuir zoom">−</button>
-                                    <span id="zoomLevel" class="text-sm font-semibold text-gray-700 min-w-[3rem] text-center px-1">100%</span>
-                                    <button type="button" onclick="typeof mapZoomIn === 'function' && mapZoomIn()" class="w-9 h-9 flex items-center justify-center rounded-md bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium text-lg transition-colors" title="Aumentar zoom">+</button>
-                                    <button type="button" onclick="typeof mapResetZoom === 'function' && mapResetZoom()" class="px-2.5 py-1.5 text-sm font-medium rounded-md transition-colors" style="background-color: #E9B32C; color: #000;" onmouseover="this.style.backgroundColor='#d19d20'" onmouseout="this.style.backgroundColor='#E9B32C'" title="Resetar zoom">Reset</button>
+                                @include('admin.network-maps.partials.map-layer-filters')
+                                <div class="absolute top-3 right-3 z-30 flex flex-wrap items-center justify-end gap-2 max-w-[calc(100%-1rem)] pointer-events-auto" role="toolbar" aria-label="Controles do mapa">
+                                    <div class="flex flex-wrap items-center gap-1.5 rounded-lg bg-white/95 shadow-lg border border-gray-200 p-1.5 backdrop-blur-sm" role="search" aria-label="Buscar colaborador no mapa">
+                                        <input type="search" id="mapCollaboratorSearch" name="map_collaborator_search" placeholder="Buscar colaborador…" autocomplete="off" class="text-sm rounded-md border border-gray-300 px-2 py-1.5 w-36 sm:w-44 min-w-0 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-1 focus:ring-amber-500">
+                                        <div id="mapSearchNav" class="hidden flex items-center gap-0.5 shrink-0">
+                                            <button type="button" id="mapSearchPrev" class="w-8 h-8 flex items-center justify-center rounded-md bg-gray-100 hover:bg-gray-200 text-gray-800 text-lg font-semibold leading-none" title="Resultado anterior">&lsaquo;</button>
+                                            <span id="mapSearchStatus" class="text-xs text-gray-800 font-semibold px-1 min-w-[5.5rem] text-center tabular-nums"></span>
+                                            <button type="button" id="mapSearchNext" class="w-8 h-8 flex items-center justify-center rounded-md bg-gray-100 hover:bg-gray-200 text-gray-800 text-lg font-semibold leading-none" title="Próximo resultado">&rsaquo;</button>
+                                        </div>
+                                        <span id="mapSearchFeedback" class="hidden text-xs text-amber-800 max-w-[12rem] leading-tight"></span>
+                                    </div>
+                                    <div class="flex items-center gap-1.5 rounded-lg bg-white/95 shadow-lg border border-gray-200 p-1.5 backdrop-blur-sm" role="group" aria-label="Rótulos no mapa">
+                                        <button type="button" id="mapShowCodes" class="px-2.5 py-1.5 rounded-md text-sm font-medium border border-gray-400 btn-engehub-yellow transition-colors">Códigos</button>
+                                        <button type="button" id="mapShowNames" class="px-2.5 py-1.5 rounded-md text-sm font-medium border border-gray-300 bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">Nomes</button>
+                                    </div>
+                                    <div class="flex items-center gap-1.5 rounded-lg bg-white/95 shadow-lg border border-gray-200 p-1.5 backdrop-blur-sm" role="group" aria-label="Zoom do mapa">
+                                        <button type="button" id="mapZoomOut" class="w-9 h-9 flex items-center justify-center rounded-md bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium text-lg transition-colors" title="Diminuir zoom">−</button>
+                                        <span id="zoomLevel" class="text-sm font-semibold text-gray-700 min-w-[3rem] text-center px-1">100%</span>
+                                        <button type="button" id="mapZoomIn" class="w-9 h-9 flex items-center justify-center rounded-md bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium text-lg transition-colors" title="Aumentar zoom">+</button>
+                                        <button type="button" id="mapZoomReset" class="px-2.5 py-1.5 text-sm font-medium rounded-md btn-engehub-yellow transition-colors" title="Resetar zoom">Reset</button>
+                                    </div>
                                 </div>
-                                <div id="mapaContainer" class="w-full h-full overflow-hidden cursor-grab" style="touch-action: none; background: #ffffff !important;">
+                                <div id="mapaContainer" class="relative z-0 w-full h-full overflow-hidden cursor-grab" style="touch-action: none; background: #ffffff !important;">
                                     <div id="svgWrapper" class="inline-block p-4" style="transform-origin: 0 0; will-change: transform; background: #ffffff;">
                                         <div id="svgContainer" class="svg-map-theme" style="background: #ffffff !important;">
                                             {!! $mapSvgContent !!}
                                         </div>
                                     </div>
                                 </div>
+                                @include('admin.network-maps.partials.device-side-panel')
                             </div>
                         </div>
                         @endif
@@ -354,20 +370,7 @@
         </div>
     </div>
 
-    <!-- Modal de Informações do Assento (Mapa de Rede) -->
-    <div id="seatModal" class="fixed inset-0 z-[9999] flex items-center justify-center p-4 hidden" style="background: rgba(17,24,39,0.6); backdrop-filter: blur(4px);" onclick="if(event.target.id==='seatModal')closeSeatModal()">
-        <div class="relative bg-white rounded-xl shadow-2xl flex flex-col w-full mx-auto my-auto" style="width: 100%; max-width: 28rem; max-height: 85vh;" onclick="event.stopPropagation()">
-            <div class="flex items-center justify-between p-5 border-b border-gray-200 bg-amber-50 rounded-t-xl shrink-0">
-                <h3 class="text-lg font-semibold text-gray-900" id="seatModalTitle">Assento</h3>
-                <button type="button" onclick="closeSeatModal()" class="p-1 text-gray-900 hover:text-gray-700 rounded">
-                    <i class="fas fa-times text-xl"></i>
-                </button>
-            </div>
-            <div class="p-5 overflow-y-auto flex-1 min-h-0 text-sm" id="seatModalContent">
-                <div class="text-center py-4"><div class="animate-spin rounded-full h-8 w-8 border-2 border-amber-500 border-t-transparent mx-auto"></div><p class="mt-2 text-gray-600">Carregando...</p></div>
-            </div>
-        </div>
-    </div>
+    @include('admin.network-maps.partials.device-modals', ['canEditDevicesEffective' => false])
 
     <!-- Modal de Logins -->
     <div id="loginsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50" onclick="handleLoginsModalClick(event)">
@@ -449,196 +452,19 @@
                 `;
             });
     }
-
-    // --- Mapa de Rede: Zoom e Pan (translate + scale para arrastar em todos os 4 eixos) ---
-    let mapZoomLevel = 1, mapTranslateX = 0, mapTranslateY = 0;
-    let mapPanStartX, mapPanStartY, mapPanStartTranslateX, mapPanStartTranslateY, mapPanning = false;
-
-    var mapRAF = null;
-    function mapApplyTransform() {
-        var w = document.getElementById('svgWrapper');
-        if (!w) return;
-        w.style.transform = 'translate(' + mapTranslateX + 'px, ' + mapTranslateY + 'px) scale(' + mapZoomLevel + ')';
-    }
-    function mapScheduleTransform() {
-        if (mapRAF !== null) return;
-        mapRAF = requestAnimationFrame(function() {
-            mapRAF = null;
-            mapApplyTransform();
-        });
-    }
-    /** Zoom centralizado no ponto (clientX, clientY). Se não passar coordenadas, usa o centro do container. */
-    function mapZoomAtPoint(clientX, clientY, zoomIn) {
-        var container = document.getElementById('mapaContainer');
-        var rect = container ? container.getBoundingClientRect() : null;
-        var mouseX = rect ? (clientX - rect.left) : 0;
-        var mouseY = rect ? (clientY - rect.top) : 0;
-        var newScale = zoomIn ? Math.min(5, mapZoomLevel + 0.25) : Math.max(0.25, mapZoomLevel - 0.25);
-        if (newScale === mapZoomLevel) return;
-        var contentX = (mouseX - mapTranslateX) / mapZoomLevel;
-        var contentY = (mouseY - mapTranslateY) / mapZoomLevel;
-        mapTranslateX = mouseX - contentX * newScale;
-        mapTranslateY = mouseY - contentY * newScale;
-        mapZoomLevel = newScale;
-        mapApplyTransform();
-        var el = document.getElementById('zoomLevel');
-        if (el) el.textContent = Math.round(mapZoomLevel * 100) + '%';
-    }
-    function mapZoomIn() {
-        var container = document.getElementById('mapaContainer');
-        if (container) {
-            var r = container.getBoundingClientRect();
-            mapZoomAtPoint(r.left + r.width / 2, r.top + r.height / 2, true);
-        } else {
-            mapZoomLevel = Math.min(5, mapZoomLevel + 0.25);
-            mapApplyTransform();
-            var el = document.getElementById('zoomLevel');
-            if (el) el.textContent = Math.round(mapZoomLevel * 100) + '%';
-        }
-    }
-    function mapZoomOut() {
-        var container = document.getElementById('mapaContainer');
-        if (container) {
-            var r = container.getBoundingClientRect();
-            mapZoomAtPoint(r.left + r.width / 2, r.top + r.height / 2, false);
-        } else {
-            mapZoomLevel = Math.max(0.25, mapZoomLevel - 0.25);
-            mapApplyTransform();
-            var el = document.getElementById('zoomLevel');
-            if (el) el.textContent = Math.round(mapZoomLevel * 100) + '%';
-        }
-    }
-    function mapResetZoom() {
-        mapZoomLevel = 1;
-        mapTranslateX = 0;
-        mapTranslateY = 0;
-        mapApplyTransform();
-        var el = document.getElementById('zoomLevel');
-        if (el) el.textContent = '100%';
-    }
-    function initMapPanZoom() {
-        var container = document.getElementById('mapaContainer');
-        var wrapper = document.getElementById('svgWrapper');
-        if (!container || !wrapper) return;
-        mapApplyTransform();
-        container.style.cursor = 'grab';
-        container.addEventListener('mousedown', function(e) {
-            if (e.target.closest('[data-seat]') || e.target.tagName === 'text' || e.target.tagName === 'tspan') return;
-            e.preventDefault();
-            e.stopPropagation();
-            mapPanning = true;
-            mapPanStartX = e.clientX;
-            mapPanStartY = e.clientY;
-            mapPanStartTranslateX = mapTranslateX;
-            mapPanStartTranslateY = mapTranslateY;
-            container.style.cursor = 'grabbing';
-            container.style.userSelect = 'none';
-        }, { passive: false });
-        document.addEventListener('mousemove', function(e) {
-            if (!mapPanning) return;
-            e.preventDefault();
-            mapTranslateX = mapPanStartTranslateX + (e.clientX - mapPanStartX);
-            mapTranslateY = mapPanStartTranslateY + (e.clientY - mapPanStartY);
-            mapScheduleTransform();
-        }, { passive: false });
-        document.addEventListener('mouseup', function() {
-            if (mapPanning) {
-                mapPanning = false;
-                container.style.cursor = 'grab';
-                container.style.userSelect = '';
-            }
-        });
-        document.addEventListener('mouseleave', function() {
-            if (mapPanning) {
-                mapPanning = false;
-                container.style.cursor = 'grab';
-                container.style.userSelect = '';
-            }
-        });
-        container.addEventListener('wheel', function(e) {
-            e.preventDefault();
-            mapZoomAtPoint(e.clientX, e.clientY, e.deltaY < 0);
-        }, { passive: false });
-    }
-    var seatLabelsSecret = @json($seatLabels ?? []);
-    function applySeatLabelsSecret() {
-        var container = document.getElementById('svgContainer');
-        if (!container) return;
-        [].forEach.call(container.querySelectorAll('[data-seat]'), function(el) {
-            var code = el.getAttribute('data-seat');
-            var original = el.getAttribute('data-original-text') || code;
-            var text = seatLabelsSecret[code] ? seatLabelsSecret[code] : original;
-            el.textContent = text;
-        });
-    }
-    document.addEventListener('DOMContentLoaded', function() {
-        initMapPanZoom();
-        var svg = document.getElementById('svgContainer');
-        if (svg) {
-            var re = /^[A-Z]+\d{2}$/;
-            function markIfLeaf(el) {
-                var t = (el.textContent || '').trim();
-                if (!re.test(t) || el.children.length > 0) return;
-                el.setAttribute('data-seat', t);
-                el.setAttribute('data-original-text', t);
-                el.classList.add('seat');
-                el.style.cursor = 'pointer';
-            }
-            [].forEach.call(svg.querySelectorAll('text'), markIfLeaf);
-            [].forEach.call(svg.querySelectorAll('tspan'), markIfLeaf);
-            [].forEach.call(svg.querySelectorAll('foreignObject'), function(fo) {
-                [].forEach.call(fo.querySelectorAll('*'), markIfLeaf);
-            });
-            applySeatLabelsSecret();
-            document.getElementById('mapaContainer').addEventListener('click', function(e) {
-                var seatEl = e.target.closest('[data-seat]');
-                if (seatEl) { e.preventDefault(); e.stopPropagation(); openSeatModal(seatEl.getAttribute('data-seat')); }
-            });
-        }
-    });
-    function openSeatModal(code) {
-        var modal = document.getElementById('seatModal');
-        var title = document.getElementById('seatModalTitle');
-        var content = document.getElementById('seatModalContent');
-        if (!modal || !content) return;
-        title.textContent = 'Assento ' + code;
-        content.innerHTML = '<div class="text-center py-4"><div class="animate-spin rounded-full h-8 w-8 border-2 border-amber-500 border-t-transparent mx-auto"></div><p class="mt-2 text-gray-600">Carregando...</p></div>';
-        modal.style.display = 'flex';
-        modal.classList.remove('hidden');
-        fetch('/api/seats/' + encodeURIComponent(code), { headers: { 'Accept': 'application/json' } })
-            .then(function(r) { return r.json(); })
-            .then(function(data) {
-                if (!data.success) { content.innerHTML = '<p class="text-red-600">Erro ao carregar.</p>'; return; }
-                var d = data.data;
-                title.textContent = (d.colaborador && d.colaborador.nome) ? (d.colaborador.nome + ' — ' + code) : ('Assento ' + code);
-                if (d.disponivel || !d.colaborador) {
-                    content.innerHTML = '<div class="text-center py-6"><i class="fas fa-chair text-4xl text-gray-400 mb-3"></i><h4 class="font-semibold text-gray-800">Assento disponível</h4><p class="text-gray-600 mt-1">O assento <strong>' + code + '</strong> está livre.</p>' + (d.setor ? '<p class="text-gray-500 mt-2 text-sm">Setor: ' + d.setor + '</p>' : '') + '</div>';
-                    return;
-                }
-                var html = '<div class="space-y-3">';
-                if (d.setor) html += '<p class="text-sm text-gray-600"><strong>Setor:</strong> ' + d.setor + '</p>';
-                if (d.observacoes) html += '<p class="text-sm text-gray-600"><strong>Observações:</strong> ' + d.observacoes + '</p>';
-                html += '<h4 class="font-semibold text-gray-800">Colaborador</h4><ul class="list-disc list-inside text-gray-700"><li>' + (d.colaborador.nome || '-') + '</li><li>' + (d.colaborador.email || '-') + '</li><li>Computador: ' + (d.colaborador.computador || '-') + '</li></ul>';
-                if (d.pontos_rede && d.pontos_rede.length) {
-                    html += '<h4 class="font-semibold text-gray-800 mt-4">Pontos de rede</h4><table class="w-full text-sm"><thead><tr class="border-b"><th class="text-left py-1">Código</th><th class="text-left py-1">IP</th></tr></thead><tbody>';
-                    d.pontos_rede.forEach(function(p) { html += '<tr class="border-b"><td class="py-1">' + (p.code || '-') + '</td><td class="py-1">' + (p.ip || '-') + '</td></tr>'; });
-                    html += '</tbody></table>';
-                }
-                if (d.historico && d.historico.length) {
-                    html += '<h4 class="font-semibold text-gray-800 mt-4">Histórico</h4><div class="max-h-40 overflow-y-auto"><table class="w-full text-sm"><thead><tr class="border-b"><th class="text-left py-1">Colaborador</th><th class="text-left py-1">Período</th></tr></thead><tbody>';
-                    d.historico.forEach(function(h) { html += '<tr class="border-b"><td class="py-1">' + (h.colaborador || '-') + '</td><td class="py-1">' + (h.periodo || '-') + '</td></tr>'; });
-                    html += '</tbody></table></div>';
-                }
-                html += '</div>';
-                content.innerHTML = html;
-            })
-            .catch(function() { content.innerHTML = '<p class="text-red-600">Erro ao carregar. Tente novamente.</p>'; });
-    }
-    function closeSeatModal() {
-        var modal = document.getElementById('seatModal');
-        if (modal) { modal.style.display = 'none'; modal.classList.add('hidden'); }
-    }
-
+</script>
+@if($activeNetworkMap && $mapSvgContent)
+<script>
+@include('admin.network-maps.partials.network-map-devices-script', [
+    'network_map' => $activeNetworkMap,
+    'filiaisMode' => false,
+    'canEditDevicesEffective' => false,
+    'deviceLabels' => $deviceLabels ?? [],
+    'deviceApiBase' => url('/api/map-devices'),
+])
+</script>
+@endif
+<script>
     // Função para copiar IP do servidor
     function copyServerIP(ip, serverName) {
         navigator.clipboard.writeText(ip).then(function() {
@@ -780,22 +606,71 @@
        Com tema CLARO o navegador pinta o SVG preto; com tema ESCURO fica certo. Tratamos o bloco como
        color-scheme: dark para o navegador aplicar a mesma renderização que no tema escuro, e forçamos
        fundo branco e texto preto por CSS. */
-    .mapa-rede-forcelight { color-scheme: dark !important; background: #ffffff !important; isolation: isolate; contain: layout style paint; }
+    .mapa-rede-forcelight { color-scheme: dark !important; background: #ffffff !important; isolation: isolate; contain: layout style; }
     .mapa-rede-forcelight #mapaContainer, .mapa-rede-forcelight #svgContainer, .mapa-rede-forcelight #svgWrapper { background: #ffffff !important; }
     .mapa-rede-forcelight .svg-map-theme svg { background-color: #ffffff !important; }
-    /* Não forçar fill/color em todo texto: preservar cores do draw.io (ex.: laranja em "RH", "PRESIDÊNCIA"). Só forçar preto nos rótulos de mesa (data-seat). */
-    .mapa-rede-forcelight .svg-map-theme [data-seat].seat { fill: #000000 !important; color: #000000 !important; }
-    .mapa-rede-forcelight .svg-map-theme foreignObject [data-seat].seat { color: #000000 !important; }
+    .btn-engehub-yellow { background-color: #E9B32C !important; color: #000 !important; }
+    .btn-engehub-yellow:hover { background-color: #d19d20 !important; }
+    /* Rótulos de dispositivo: preto no mapa forçado */
+    .mapa-rede-forcelight .svg-map-theme [data-code].device { fill: #000000 !important; color: #000000 !important; }
+    .mapa-rede-forcelight .svg-map-theme foreignObject [data-code].device { color: #000000 !important; }
     /* Quando o navegador está em tema CLARO, forçar mesma renderização que no tema escuro */
     @media (prefers-color-scheme: light) {
         .mapa-rede-forcelight, .mapa-rede-forcelight * { color-scheme: dark !important; }
         .mapa-rede-forcelight .svg-map-theme svg { background: #ffffff !important; background-color: #ffffff !important; }
     }
     /* Não forçar stroke preto em path/line/polyline/rect para preservar cores do draw.io (ex.: borda laranja nas mesas) */
-    .svg-map-theme [data-seat].seat { cursor: pointer !important; }
-    .svg-map-theme [data-seat].seat:hover { fill: #b45309 !important; }
-    .svg-map-theme foreignObject [data-seat].seat:hover { color: #b45309 !important; }
+    .svg-map-theme [data-code].device { cursor: pointer !important; }
+    .svg-map-theme [data-code].device:hover { fill: #b45309 !important; }
+    .svg-map-theme foreignObject [data-code].device:hover { color: #b45309 !important; }
+    .svg-map-theme .device.device-search-highlight {
+        filter: drop-shadow(0 0 3px #E9B32C) drop-shadow(0 0 6px rgba(233, 179, 44, 0.85));
+        transition: filter 0.35s ease;
+    }
+    .svg-map-theme foreignObject .device.device-search-highlight {
+        box-shadow: 0 0 0 2px #E9B32C, 0 0 12px rgba(233, 179, 44, 0.6);
+        transition: box-shadow 0.35s ease;
+    }
+    .svg-map-theme .device.map-layer-filter-hidden {
+        visibility: hidden !important;
+        pointer-events: none !important;
+    }
+    .svg-map-theme foreignObject .device.map-layer-filter-hidden {
+        visibility: hidden !important;
+        pointer-events: none !important;
+    }
     #mapaContainer svg { max-width: none !important; height: auto !important; }
+    #deviceSidePanel.map-device-panel {
+        position: absolute;
+        right: 0.75rem;
+        top: 4.25rem;
+        bottom: 0.75rem;
+        width: min(22rem, 36vw);
+        min-width: 280px;
+        max-width: 400px;
+        z-index: 25;
+        border-radius: 0.75rem;
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.14);
+        border: 1px solid #e5e7eb;
+        opacity: 0;
+        visibility: hidden;
+        transform: translateX(10px);
+        transition: opacity 0.28s ease, transform 0.28s ease, visibility 0.28s;
+        pointer-events: none;
+    }
+    #deviceSidePanel.map-device-panel.map-device-panel--open {
+        opacity: 1;
+        visibility: visible;
+        transform: translateX(0);
+        pointer-events: auto;
+    }
+    @media (max-width: 640px) {
+        #deviceSidePanel.map-device-panel {
+            width: min(20rem, calc(100vw - 4rem));
+            min-width: 0;
+            right: 0.5rem;
+        }
+    }
     
     /* Garantir que os cards não bloqueiem tooltips */
     .cards-grid > div {

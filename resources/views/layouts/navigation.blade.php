@@ -22,11 +22,14 @@
                         <x-nav-link :href="route('cameras.index')" :active="request()->routeIs('cameras.*')">
                             {{ __('Câmeras') }}
                         </x-nav-link>
+                        <x-nav-link :href="route('filiais.index')" :active="request()->routeIs('filiais.*')">
+                            {{ __('Filiais') }}
+                        </x-nav-link>
                     @endif
                     
                     @if(auth()->check() && auth()->user()->hasFullAccess())
                         @php
-                            $gerenciarActive = request()->routeIs('admin.cards.*') || request()->routeIs('admin.system-users.*') || request()->routeIs('admin.sectors.*') || request()->routeIs('admin.network-maps.*') || request()->routeIs('admin.servers.*') || request()->routeIs('admin.cameras.*') || request()->routeIs('admin.forms.*') || request()->routeIs('admin.branches.*');
+                            $gerenciarActive = request()->routeIs('admin.cards.*') || request()->routeIs('admin.system-users.*') || request()->routeIs('admin.sectors.*') || request()->routeIs('admin.network-maps.*') || request()->routeIs('admin.servers.*') || request()->routeIs('admin.cameras.*') || request()->routeIs('admin.forms.*') || request()->routeIs('admin.branches.*') || request()->routeIs('admin.extension-list.*');
                         @endphp
                         <div class="relative inline-flex" x-data="{ open: false }" @mouseenter="open = true" @mouseleave="open = false" @click.outside="open = false">
                             <button type="button" @click="open = ! open" :class="{ 'gerenciar-dropdown-open': open }" class="inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium leading-5 transition duration-150 ease-in-out cursor-pointer gerenciar-dropdown-trigger {{ $gerenciarActive ? 'border-primary-400 text-primary-400' : 'border-transparent text-gray-500' }}">
@@ -48,6 +51,7 @@
                                     <a href="{{ route('admin.cameras.index') }}" class="block px-4 py-2 text-sm text-gray-200 hover:bg-gray-700 hover:text-white transition duration-150 ease-in-out">Gerenciar Câmeras</a>
                                     <a href="{{ route('admin.cards.index') }}" class="block px-4 py-2 text-sm text-gray-200 hover:bg-gray-700 hover:text-white transition duration-150 ease-in-out">Gerenciar Cards</a>
                                     <a href="{{ route('admin.forms.index') }}" class="block px-4 py-2 text-sm text-gray-200 hover:bg-gray-700 hover:text-white transition duration-150 ease-in-out">Gerenciar Formulários e Checklists</a>
+                                    <a href="{{ route('admin.extension-list.index') }}" class="block px-4 py-2 text-sm text-gray-200 hover:bg-gray-700 hover:text-white transition duration-150 ease-in-out">Gerenciar Lista de Ramais</a>
                                     <a href="{{ route('admin.network-maps.index') }}" class="block px-4 py-2 text-sm text-gray-200 hover:bg-gray-700 hover:text-white transition duration-150 ease-in-out">Gerenciar Mapas de Rede</a>
                                     <a href="{{ route('admin.servers.index') }}" class="block px-4 py-2 text-sm text-gray-200 hover:bg-gray-700 hover:text-white transition duration-150 ease-in-out">Gerenciar Servidores</a>
                                     <a href="{{ route('admin.sectors.index') }}" class="block px-4 py-2 text-sm text-gray-200 hover:bg-gray-700 hover:text-white transition duration-150 ease-in-out">Gerenciar Setores</a>
@@ -123,6 +127,12 @@
                 <x-responsive-nav-link :href="route('servers.index')" :active="request()->routeIs('servers.*')">
                     {{ __('Servidores') }}
                 </x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('cameras.index')" :active="request()->routeIs('cameras.*')">
+                    {{ __('Câmeras') }}
+                </x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('filiais.index')" :active="request()->routeIs('filiais.*')">
+                    {{ __('Filiais') }}
+                </x-responsive-nav-link>
             @endif
             
             @if(auth()->check() && auth()->user()->hasFullAccess())
@@ -149,6 +159,9 @@
                         </x-responsive-nav-link>
                         <x-responsive-nav-link :href="route('admin.forms.index')" :active="request()->routeIs('admin.forms.*') || request()->routeIs('admin.branches.*')">
                             {{ __('Gerenciar Formulários e Checklists') }}
+                        </x-responsive-nav-link>
+                        <x-responsive-nav-link :href="route('admin.extension-list.index')" :active="request()->routeIs('admin.extension-list.*')">
+                            {{ __('Gerenciar Lista de Ramais') }}
                         </x-responsive-nav-link>
                         <x-responsive-nav-link :href="route('admin.network-maps.index')" :active="request()->routeIs('admin.network-maps.*')">
                             {{ __('Gerenciar Mapas de Rede') }}

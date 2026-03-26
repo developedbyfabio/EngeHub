@@ -3,17 +3,16 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Device;
 use App\Models\NetworkMap;
-use App\Models\Seat;
-use App\Models\SeatNetworkPoint;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
-
 class NetworkMapController extends Controller
 {
     public function index()
     {
-        $maps = NetworkMap::withCount('seats')->latest()->paginate(10);
+        $maps = NetworkMap::withCount('devices')->latest()->paginate(10);
+
         return view('admin.network-maps.index', compact('maps'));
     }
 
@@ -35,7 +34,7 @@ class NetworkMapController extends Controller
         ]);
 
         $file = $request->file('file');
-        $fileName = time() . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '_', $file->getClientOriginalName());
+        $fileName = time().'_'.preg_replace('/[^a-zA-Z0-9._-]/', '_', $file->getClientOriginalName());
         $file->move(public_path('media'), $fileName);
 
         $map = NetworkMap::create([
@@ -45,145 +44,171 @@ class NetworkMapController extends Controller
             'is_active' => $request->boolean('is_active', true),
         ]);
 
-        $synced = $map->syncSeatsFromSvg();
+        $synced = $map->syncDevicesFromSvg();
 
         return redirect()->route('admin.network-maps.index')
-            ->with('success', 'Mapa criado com sucesso. ' . $synced . ' mesas detectadas na varredura do SVG.');
+            ->with('success', 'Mapa criado com sucesso. '.$synced.' dispositivo(s) detectado(s) no SVG.');
     }
 
     public function show(NetworkMap $network_map)
     {
-        $network_map->load(['seats.currentAssignment.user', 'seats.networkPoints']);
+        $network_map->load(['devices']);
         $svgContent = $network_map->fileExists() ? $network_map->getSvgContent() : null;
-        // Mapa código da mesa => nome do colaborador (para exibir no SVG)
-        $seatLabels = $network_map->seats->mapWithKeys(function ($seat) {
-            $a = $seat->currentAssignment;
-            $name = $a ? ($a->collaborator_name ?: $a->user?->name) : null;
-            return [$seat->code => $name ?: null];
-        })->toArray();
-        return view('admin.network-maps.show', compact('network_map', 'svgContent', 'seatLabels'));
+
+        $deviceLabels = $network_map->devices
+            ->where('type', 'SEAT')
+            ->mapWithKeys(function (Device $d) {
+                $name = $d->metadata['collaborator_name'] ?? null;
+
+                return [$d->full_code => $name];
+            })
+            ->toArray();
+
+        return view('admin.network-maps.show', [
+            'network_map' => $network_map,
+            'svgContent' => $svgContent,
+            'deviceLabels' => $deviceLabels,
+            'canEditDevices' => true,
+        ]);
     }
 
-    /**
-     * Retorna dados da mesa para o modal de edição (JSON).
-     */
-    public function getSeat(NetworkMap $network_map, string $code)
+    public function getDevice(NetworkMap $network_map, string $type, string $code)
     {
-        $seat = $network_map->seats()->where('code', $code)->with(['currentAssignment.user', 'networkPoints'])->first();
-        if (!$seat) {
-            return response()->json(['success' => false, 'message' => 'Mesa não encontrada'], 404);
+        $type = strtoupper($type);
+        if (! in_array($type, Device::TYPES, true)) {
+            return response()->json(['success' => false, 'message' => 'Tipo inválido'], 400);
         }
-        $points = $seat->networkPoints->sortBy('code')->values();
+
+        $device = $network_map->devices()
+            ->where('type', $type)
+            ->where('code', $code)
+            ->first();
+
+        if (! $device) {
+            return response()->json(['success' => false, 'message' => 'Dispositivo não encontrado'], 404);
+        }
+
         return response()->json([
             'success' => true,
-            'seat' => [
-                'id' => $seat->id,
-                'code' => $seat->code,
-                'setor' => $seat->setor,
-                'observacoes' => $seat->observacoes,
-                'current_assignment' => $seat->currentAssignment ? [
-                    'id' => $seat->currentAssignment->id,
-                    'collaborator_name' => $seat->currentAssignment->collaborator_name,
-                    'computer_name' => $seat->currentAssignment->computer_name,
-                ] : null,
-                'network_points' => [
-                    $points->get(0) ? ['id' => $points[0]->id, 'code' => $points[0]->code, 'ip' => $points[0]->ip, 'mac_address' => $points[0]->mac_address] : ['id' => null, 'code' => $seat->code . '-01', 'ip' => '', 'mac_address' => ''],
-                    $points->get(1) ? ['id' => $points[1]->id, 'code' => $points[1]->code, 'ip' => $points[1]->ip, 'mac_address' => $points[1]->mac_address] : ['id' => null, 'code' => $seat->code . '-02', 'ip' => '', 'mac_address' => ''],
-                ],
-            ],
+            'device' => $device->toApiArray(),
         ]);
     }
 
-    /**
-     * Atualiza os dados da mesa (setor, observações, colaborador, pontos de rede).
-     */
-    public function updateSeat(Request $request, NetworkMap $network_map, string $code)
+    public function updateDevice(Request $request, NetworkMap $network_map, string $type, string $code)
     {
-        $seat = $network_map->seats()->firstOrCreate(
-            ['code' => $code],
-            ['setor' => null, 'observacoes' => null]
-        );
+        $type = strtoupper($type);
+        if (! in_array($type, Device::TYPES, true)) {
+            return response()->json(['success' => false, 'message' => 'Tipo inválido'], 400);
+        }
 
-        $request->validate([
+        $device = $network_map->devices()
+            ->where('type', $type)
+            ->where('code', $code)
+            ->first();
+
+        if (! $device) {
+            return response()->json(['success' => false, 'message' => 'Dispositivo não encontrado'], 404);
+        }
+
+        $rules = [
             'setor' => 'nullable|string|max:100',
             'observacoes' => 'nullable|string|max:500',
-            'collaborator_name' => 'nullable|string|max:255',
-            'computer_name' => 'nullable|string|max:100',
-            'point_1_code' => 'nullable|string|max:20',
-            'point_1_ip' => 'nullable|string|max:45',
-            'point_1_mac' => 'nullable|string|max:50',
-            'point_2_code' => 'nullable|string|max:20',
-            'point_2_ip' => 'nullable|string|max:45',
-            'point_2_mac' => 'nullable|string|max:50',
+            'metadata' => 'nullable|array',
+        ];
+
+        if ($type === 'SEAT') {
+            $rules['metadata.collaborator_name'] = 'nullable|string|max:255';
+            $rules['metadata.computer_name'] = 'nullable|string|max:100';
+            $rules['metadata.computer_kind'] = 'nullable|in:desktop,notebook';
+            $rules['metadata.computer_ip'] = 'nullable|string|max:45';
+            $rules['workstation_photo'] = 'nullable|image|max:5120';
+            $rules['remove_workstation_photo'] = 'nullable|boolean';
+        } elseif ($type === 'PRINTER') {
+            $rules['metadata.ip'] = 'nullable|string|max:45';
+            $rules['metadata.model'] = 'nullable|string|max:150';
+        } elseif ($type === 'TV') {
+            $rules['metadata.location'] = 'nullable|string|max:255';
+        } elseif ($type === 'SCAN') {
+            $rules['metadata.sector'] = 'nullable|string|max:150';
+        } elseif ($type === 'PHONE') {
+            $rules['metadata.extension'] = 'nullable|string|max:50';
+        } elseif ($type === 'AP') {
+            $rules['metadata.ssid'] = 'nullable|string|max:100';
+            $rules['metadata.location'] = 'nullable|string|max:255';
+        } elseif ($type === 'OUTLET') {
+            $rules['metadata.outlet_type'] = 'nullable|in:network,phone';
+        }
+
+        if (in_array($type, ['PRINTER', 'TV', 'SCAN', 'PHONE', 'AP', 'OUTLET'], true)) {
+            $rules['device_photo'] = 'nullable|image|max:5120';
+            $rules['remove_device_photo'] = 'nullable|boolean';
+        }
+
+        $validated = $request->validate($rules);
+
+        $metaIn = $validated['metadata'] ?? [];
+        $merged = array_merge($device->metadata ?? [], is_array($metaIn) ? $metaIn : []);
+
+        if ($type === 'SEAT') {
+            foreach ([
+                'point_1_code', 'point_1_ip', 'point_1_mac',
+                'point_2_code', 'point_2_ip', 'point_2_mac',
+            ] as $legacyKey) {
+                unset($merged[$legacyKey]);
+            }
+            if ($request->boolean('remove_workstation_photo')) {
+                $old = $merged['workstation_photo'] ?? null;
+                if (is_string($old) && $old !== '' && Storage::disk('public')->exists($old)) {
+                    Storage::disk('public')->delete($old);
+                }
+                $merged['workstation_photo'] = null;
+            }
+            if ($request->hasFile('workstation_photo')) {
+                $old = $merged['workstation_photo'] ?? null;
+                if (is_string($old) && $old !== '' && Storage::disk('public')->exists($old)) {
+                    Storage::disk('public')->delete($old);
+                }
+                $merged['workstation_photo'] = $request->file('workstation_photo')->store('workstations', 'public');
+            }
+        }
+
+        if (in_array($type, ['PRINTER', 'TV', 'SCAN', 'PHONE', 'AP', 'OUTLET'], true)) {
+            if ($request->boolean('remove_device_photo')) {
+                $old = $merged['device_photo'] ?? null;
+                if (is_string($old) && $old !== '' && Storage::disk('public')->exists($old)) {
+                    Storage::disk('public')->delete($old);
+                }
+                $merged['device_photo'] = null;
+            }
+            if ($request->hasFile('device_photo')) {
+                $old = $merged['device_photo'] ?? null;
+                if (is_string($old) && $old !== '' && Storage::disk('public')->exists($old)) {
+                    Storage::disk('public')->delete($old);
+                }
+                $merged['device_photo'] = $request->file('device_photo')->store('map-device-photos', 'public');
+            }
+        }
+
+        $device->update([
+            'setor' => $request->has('setor') ? $request->input('setor') : $device->setor,
+            'observacoes' => $request->has('observacoes') ? $request->input('observacoes') : $device->observacoes,
+            'metadata' => $merged,
         ]);
 
-        $seat->update([
-            'setor' => $request->input('setor'),
-            'observacoes' => $request->input('observacoes'),
+        $device->refresh();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Dispositivo atualizado com sucesso.',
+            'device' => $device->toApiArray(),
         ]);
-
-        $collaboratorName = $request->filled('collaborator_name') ? trim($request->input('collaborator_name')) : null;
-        if ($collaboratorName !== null && $collaboratorName !== '') {
-            if ($seat->currentAssignment) {
-                $seat->currentAssignment->update([
-                    'collaborator_name' => $collaboratorName,
-                    'computer_name' => $request->input('computer_name'),
-                ]);
-            } else {
-                $seat->assignCollaborator($collaboratorName, $request->input('computer_name'), 'Alteração pelo admin');
-            }
-        } else {
-            if ($seat->currentAssignment) {
-                $seat->release('Liberado pelo admin');
-            }
-        }
-        if ($seat->currentAssignment && $request->has('computer_name')) {
-            $seat->currentAssignment->update(['computer_name' => $request->input('computer_name')]);
-        }
-
-        $points = $seat->networkPoints()->orderBy('code')->get();
-        $p1 = $points->get(0);
-        $p2 = $points->get(1);
-        if ($p1) {
-            $p1->update([
-                'code' => $request->input('point_1_code', $p1->code),
-                'ip' => $request->input('point_1_ip'),
-                'mac_address' => $request->input('point_1_mac'),
-            ]);
-        } else {
-            $seat->networkPoints()->create([
-                'code' => $request->input('point_1_code', $seat->code . '-01'),
-                'ip' => $request->input('point_1_ip'),
-                'mac_address' => $request->input('point_1_mac'),
-            ]);
-        }
-        $seat->load('networkPoints');
-        $points = $seat->networkPoints->sortBy('code')->values();
-        $p2 = $points->get(1);
-        if ($p2) {
-            $p2->update([
-                'code' => $request->input('point_2_code', $p2->code),
-                'ip' => $request->input('point_2_ip'),
-                'mac_address' => $request->input('point_2_mac'),
-            ]);
-        } else {
-            $seat->networkPoints()->create([
-                'code' => $request->input('point_2_code', $seat->code . '-02'),
-                'ip' => $request->input('point_2_ip'),
-                'mac_address' => $request->input('point_2_mac'),
-            ]);
-        }
-
-        return response()->json(['success' => true, 'message' => 'Mesa atualizada com sucesso.']);
     }
 
-    /**
-     * Reexecuta a varredura do SVG e sincroniza mesas (sem substituir o arquivo).
-     */
-    public function resyncSeats(NetworkMap $network_map)
+    public function resyncDevices(NetworkMap $network_map)
     {
-        $synced = $network_map->syncSeatsFromSvg();
-        return back()->with('success', 'Varredura concluída. ' . $synced . ' mesas no mapa.');
+        $synced = $network_map->syncDevicesFromSvg();
+
+        return back()->with('success', 'Varredura concluída. '.$synced.' dispositivo(s) no mapa.');
     }
 
     public function edit(NetworkMap $network_map)
@@ -204,7 +229,7 @@ class NetworkMapController extends Controller
                 @unlink($network_map->full_path);
             }
             $file = $request->file('file');
-            $fileName = time() . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '_', $file->getClientOriginalName());
+            $fileName = time().'_'.preg_replace('/[^a-zA-Z0-9._-]/', '_', $file->getClientOriginalName());
             $file->move(public_path('media'), $fileName);
             $network_map->file_name = $fileName;
         }
@@ -213,10 +238,10 @@ class NetworkMapController extends Controller
         $network_map->is_active = $request->boolean('is_active', $network_map->is_active);
         $network_map->save();
 
-        $synced = $network_map->syncSeatsFromSvg();
+        $synced = $network_map->syncDevicesFromSvg();
 
         return redirect()->route('admin.network-maps.index')
-            ->with('success', 'Mapa atualizado com sucesso. ' . $synced . ' mesas na varredura.');
+            ->with('success', 'Mapa atualizado com sucesso. '.$synced.' dispositivo(s) na varredura.');
     }
 
     public function destroy(NetworkMap $network_map)
@@ -225,14 +250,16 @@ class NetworkMapController extends Controller
             @unlink($network_map->full_path);
         }
         $network_map->delete();
+
         return redirect()->route('admin.network-maps.index')
             ->with('success', 'Mapa excluído com sucesso.');
     }
 
     public function toggleStatus(NetworkMap $networkMap)
     {
-        $networkMap->update(['is_active' => !$networkMap->is_active]);
+        $networkMap->update(['is_active' => ! $networkMap->is_active]);
         $status = $networkMap->is_active ? 'ativado' : 'desativado';
+
         return back()->with('success', "Mapa {$status} com sucesso.");
     }
 }

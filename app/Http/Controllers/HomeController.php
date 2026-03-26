@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ExtensionListDocument;
 use App\Models\Tab;
 use App\Models\Card;
 use App\Models\UserFavorite;
@@ -44,6 +45,13 @@ class HomeController extends Controller
             ];
         }
 
-        return view('home', compact('tabs', 'favoritesTab', 'favoriteCardIds'));
+        $extensionListSvgUrl = null;
+        if (Auth::guard('web')->check() || Auth::guard('system')->check()) {
+            if (ExtensionListDocument::current()) {
+                $extensionListSvgUrl = route('extension-list.document');
+            }
+        }
+
+        return view('home', compact('tabs', 'favoritesTab', 'favoriteCardIds', 'extensionListSvgUrl'));
     }
 } 
