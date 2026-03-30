@@ -58,6 +58,43 @@ class Card extends Model
     }
 
     /**
+     * Grupos de usuários web que podem ver o card na página Início.
+     *
+     * - Com grupos associados: só esses grupos enxergam o card.
+     * - Sem grupos: visível como “catálogo geral” apenas para quem não tem grupo web atribuído
+     *   (visitante ou usuário logado sem user_group_id), não para grupos limitados tipo Administrativo.
+     */
+    public function userGroups()
+    {
+        return $this->belongsToMany(UserGroup::class, 'card_user_group')->withTimestamps();
+    }
+
+    /**
+     * @param  ?int  $viewerGroupId  user_group_id (null = visitante ou usuário sem grupo).
+     * @param  bool  $ignoreGroupRestrictions  Grupo com acesso total / legado full_access: vê todos os cards.
+     */
+    public function isVisibleToUserGroup(?int $viewerGroupId, bool $ignoreGroupRestrictions = false): bool
+    {
+        if ($ignoreGroupRestrictions) {
+            return true;
+        }
+
+        $allowedIds = $this->relationLoaded('userGroups')
+            ? $this->userGroups->pluck('id')
+            : $this->userGroups()->pluck('user_groups.id');
+
+        if ($allowedIds->isEmpty()) {
+            return $viewerGroupId === null;
+        }
+
+        if ($viewerGroupId === null) {
+            return false;
+        }
+
+        return $allowedIds->contains($viewerGroupId);
+    }
+
+    /**
      * Relacionamento com SystemLogin (logins e senhas do sistema)
      */
     public function systemLogins()

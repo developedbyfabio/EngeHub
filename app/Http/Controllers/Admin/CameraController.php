@@ -4,15 +4,20 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Dvr;
+use App\Models\DvrFoto;
 use App\Models\Camera;
 use App\Models\CameraChecklistItem;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class CameraController extends Controller
 {
     public function index()
     {
-        $dvrs = Dvr::with(['cameras' => fn ($q) => $q->orderBy('ordem')->orderBy('created_at')])->orderBy('nome')->get();
+        $dvrs = Dvr::with([
+            'cameras' => fn ($q) => $q->orderBy('ordem')->orderBy('created_at'),
+            'fotos' => fn ($q) => $q->orderByDesc('created_at'),
+        ])->orderBy('nome')->get();
 
         $cameraIds = $dvrs->pluck('cameras')->flatten()->pluck('id')->unique()->filter()->values();
         $problemaHistoricoPorCamera = CameraChecklistItem::where(function ($q) {
@@ -66,8 +71,60 @@ class CameraController extends Controller
         return redirect()->route('admin.cameras.index')->with('success', 'DVR atualizado com sucesso.');
     }
 
+    public function storeDvrFoto(Request $request, Dvr $dvr)
+    {
+        $validated = $request->validate([
+            'foto' => 'required|image|mimes:jpeg,png,jpg,gif,webp|max:5120',
+        ]);
+
+        $path = $request->file('foto')->store('dvr-fotos', 'public');
+
+        DvrFoto::create([
+            'dvr_id' => $dvr->id,
+            'disk' => 'public',
+            'path' => $path,
+            'original_filename' => $request->file('foto')->getClientOriginalName(),
+            'user_id' => $request->user()?->id,
+        ]);
+
+        if ($request->ajax() || $request->wantsJson() || $request->header('X-Requested-With') === 'XMLHttpRequest') {
+            return response()->json(['success' => true, 'message' => 'Foto do DVR anexada com sucesso.']);
+        }
+
+        return redirect()->route('admin.cameras.index')->with('success', 'Foto do DVR anexada com sucesso.');
+    }
+
+    public function destroyDvrFoto(Request $request, Dvr $dvr, DvrFoto $dvrFoto)
+    {
+        if ((int) $dvrFoto->dvr_id !== (int) $dvr->id) {
+            abort(404);
+        }
+
+        $senha = $request->input('senha');
+        if ($senha !== config('app.cameras_delete_history_password')) {
+            return response()->json(['success' => false, 'message' => 'Senha incorreta.'], 422);
+        }
+
+        if ($dvrFoto->path && Storage::disk($dvrFoto->disk)->exists($dvrFoto->path)) {
+            Storage::disk($dvrFoto->disk)->delete($dvrFoto->path);
+        }
+        $dvrFoto->delete();
+
+        if ($request->ajax() || $request->wantsJson() || $request->header('X-Requested-With') === 'XMLHttpRequest') {
+            return response()->json(['success' => true, 'message' => 'Foto removida do histórico.']);
+        }
+
+        return redirect()->route('admin.cameras.index')->with('success', 'Foto removida do histórico.');
+    }
+
     public function destroyDvr(Dvr $dvr)
     {
+        foreach ($dvr->fotos as $foto) {
+            if ($foto->path && Storage::disk($foto->disk)->exists($foto->path)) {
+                Storage::disk($foto->disk)->delete($foto->path);
+            }
+        }
+        $dvr->fotos()->delete();
         $dvr->cameras()->delete();
         $dvr->delete();
 

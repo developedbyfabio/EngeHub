@@ -40,6 +40,9 @@
         </main>
     </div>
 
+    {{-- Modais portados para fora de <main> (fixed cobre nav + cabeçalho da página) --}}
+    @stack('body-modals')
+
     <!-- Toast Notification System -->
     @include('components.toast-notification')
     

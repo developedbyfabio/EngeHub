@@ -25,6 +25,7 @@ use App\Http\Controllers\FormController;
 use App\Http\Controllers\FiliaisController;
 use App\Http\Controllers\ExtensionListDocumentController;
 use App\Http\Controllers\Admin\ExtensionListController;
+use App\Http\Controllers\Admin\UserGroupController;
 
 // Formulários públicos (anônimos, sem layout do sistema)
 Route::middleware(['throttle:30,1'])->prefix('formulario')->name('form.')->group(function () {
@@ -42,13 +43,13 @@ Route::middleware(['secret.url', 'throttle:60,1'])->prefix('s')->group(function 
 Route::get('/', [HomeController::class, 'index'])->name('home')->middleware('public.auth');
 
 // Rota pública para visualizar servidores
-Route::get('/servers', [ServerController::class, 'index'])->name('servers.index')->middleware('public.auth');
+Route::get('/servers', [ServerController::class, 'index'])->name('servers.index')->middleware(['public.auth', 'nav.access:servers']);
 
 // Rota para verificação de status de servidores (usuários logados)
-Route::post('/servers/{server}/check-status', [ServerController::class, 'checkStatus'])->name('servers.check-status')->middleware('auth');
+Route::post('/servers/{server}/check-status', [ServerController::class, 'checkStatus'])->name('servers.check-status')->middleware(['auth', 'nav.access:servers']);
 
 // Rota pública para acessar logins de cards (usuários comuns precisam acessar)
-Route::get('/cards/{card}/logins', [CardController::class, 'logins'])->name('public.cards.logins')->middleware('public.auth');
+Route::get('/cards/{card}/logins', [CardController::class, 'logins'])->name('public.cards.logins')->middleware(['public.auth', 'nav.access:servers']);
 
 // Rota de teste do sistema de toast
 Route::get('/test-toast', function () {
@@ -71,7 +72,7 @@ Route::middleware(['auth.any'])->group(function () {
 });
 
 // Rotas para favoritos (protegidas por autenticação)
-Route::middleware(['auth.any'])->prefix('favorites')->name('favorites.')->group(function () {
+Route::middleware(['auth.any', 'nav.access:servers'])->prefix('favorites')->name('favorites.')->group(function () {
     Route::post('/{card}/toggle', [FavoriteController::class, 'toggle'])->name('toggle');
     Route::get('/', [FavoriteController::class, 'index'])->name('index');
     Route::get('/{card}/check', [FavoriteController::class, 'check'])->name('check');
@@ -82,7 +83,9 @@ Route::middleware(['auth.any', 'admin.access'])->prefix('admin')->name('admin.')
     // Rotas para gerenciamento de abas
     Route::resource('tabs', TabController::class);
 
-    // Rotas para gerenciamento de cards
+    // Rotas para gerenciamento de cards (rotas estáticas antes do resource para não conflitar com {card})
+    Route::get('/cards/group-permissions-matrix/data', [CardController::class, 'groupPermissionsMatrixData'])->name('cards.group-permissions-matrix.data');
+    Route::post('/cards/group-permissions-matrix', [CardController::class, 'syncGroupPermissionsMatrix'])->name('cards.group-permissions-matrix.sync');
     Route::resource('cards', CardController::class);
     Route::get('/cards/{card}/logins', [CardController::class, 'logins'])->name('cards.logins');
     Route::get('/cards/{card}/check-status', [CardController::class, 'checkStatus'])->name('cards.check-status');
@@ -108,10 +111,13 @@ Route::middleware(['auth.any', 'admin.access'])->prefix('admin')->name('admin.')
     // Rotas para gerenciamento de grupos de servidores
     Route::resource('server-groups', ServerGroupController::class);
 
+    Route::get('/user-groups', [UserGroupController::class, 'index'])->name('user-groups.index');
+    Route::post('/user-groups', [UserGroupController::class, 'store'])->name('user-groups.store');
+    Route::put('/user-groups/{userGroup}', [UserGroupController::class, 'update'])->name('user-groups.update');
+    Route::delete('/user-groups/{userGroup}', [UserGroupController::class, 'destroy'])->name('user-groups.destroy');
+
     // Rotas para gerenciamento de usuários dos sistemas
     Route::resource('system-users', SystemUserController::class)->parameters(['system-users' => 'user']);
-    Route::get('/system-users/{user}/permissions', [SystemUserController::class, 'permissions'])->name('system-users.permissions');
-    Route::post('/system-users/{user}/permissions', [SystemUserController::class, 'updatePermissions'])->name('system-users.update-permissions');
     Route::get('/system-users/{user}/secret-url', [SystemUserController::class, 'showSecretUrl'])->name('system-users.secret-url');
     Route::post('/system-users/{user}/secret-url/regenerate', [SystemUserController::class, 'regenerateSecretUrl'])->name('system-users.secret-url.regenerate');
     Route::post('/system-users/{user}/secret-url/toggle', [SystemUserController::class, 'toggleSecretUrl'])->name('system-users.secret-url.toggle');
@@ -145,6 +151,8 @@ Route::middleware(['auth.any', 'admin.access'])->prefix('admin')->name('admin.')
     Route::put('/cameras/dvrs/{dvr}', [AdminCameraController::class, 'updateDvr'])->name('cameras.dvrs.update');
     Route::delete('/cameras/dvrs/{dvr}', [AdminCameraController::class, 'destroyDvr'])->name('cameras.dvrs.destroy');
     Route::post('/cameras/dvrs/{dvr}/toggle-status', [AdminCameraController::class, 'toggleDvrStatus'])->name('cameras.dvrs.toggle-status');
+    Route::post('/cameras/dvrs/{dvr}/fotos', [AdminCameraController::class, 'storeDvrFoto'])->name('cameras.dvrs.fotos.store');
+    Route::delete('/cameras/dvrs/{dvr}/fotos/{dvrFoto}', [AdminCameraController::class, 'destroyDvrFoto'])->name('cameras.dvrs.fotos.destroy');
     Route::post('/cameras/dvrs/{dvr}/reorder-cameras', [AdminCameraController::class, 'reorderCameras'])->name('cameras.dvrs.reorder-cameras');
     Route::post('/cameras/dvrs/{dvr}/import-cameras', [AdminCameraController::class, 'importCameras'])->name('cameras.dvrs.import-cameras');
     Route::get('/cameras/cameras/create', [AdminCameraController::class, 'createCameraForm'])->name('cameras.cameras.create');
@@ -216,16 +224,17 @@ Route::middleware(['auth.any', 'admin.access'])->prefix('admin')->name('admin.')
 });
 
 // Filiais — visualização dos mapas de rede ativos (mesmo layout do mapa admin)
-Route::middleware(['auth.any'])->prefix('filiais')->name('filiais.')->group(function () {
+Route::middleware(['auth.any', 'nav.access:filiais'])->prefix('filiais')->name('filiais.')->group(function () {
     Route::get('/', [FiliaisController::class, 'index'])->name('index');
     Route::get('/network-maps/{network_map}/devices/{type}/{code}', [FiliaisController::class, 'getDevice'])->name('network-maps.devices.get');
 });
 
 // Rotas de câmeras (checklists operacionais)
-Route::middleware(['auth.any'])->prefix('cameras')->name('cameras.')->group(function () {
+Route::middleware(['auth.any', 'nav.access:cameras'])->prefix('cameras')->name('cameras.')->group(function () {
     Route::get('/', [CameraController::class, 'index'])->name('index');
     Route::post('/checklists', [CameraController::class, 'storeChecklist'])->name('checklists.store');
     Route::post('/historico/apagar', [CameraController::class, 'apagarHistorico'])->name('historico.apagar');
+    Route::post('/checklists/{checklist}/apagar-historico', [CameraController::class, 'apagarHistoricoItem'])->name('checklists.apagar-historico');
     Route::get('/checklists/{checklist}', [CameraController::class, 'showChecklist'])->name('checklists.show');
     Route::get('/checklists/{checklist}/detalhes', [CameraController::class, 'showChecklistDetalhes'])->name('checklists.detalhes');
     Route::post('/checklists/{checklist}/itens', [CameraController::class, 'storeItem'])->name('checklists.itens.store');

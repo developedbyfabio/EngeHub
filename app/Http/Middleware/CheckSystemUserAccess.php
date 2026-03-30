@@ -30,8 +30,7 @@ class CheckSystemUserAccess
 
         // Se for um User admin, verificar permissões
         if ($user instanceof \App\Models\User) {
-            // Verificar se tem permissões de admin
-            if ($user->hasFullAccess() || $user->canManageSystemUsers()) {
+            if ($user->hasFullAccess() || $user->canManageSystemUsers() || $user->canAccessAnyAdminNav()) {
                 return $next($request);
             }
         }

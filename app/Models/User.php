@@ -22,6 +22,8 @@ class User extends Authenticatable
         'username',
         'email',
         'password',
+        'user_group_id',
+        'enabled_services',
     ];
 
     /**
@@ -42,7 +44,51 @@ class User extends Authenticatable
     protected $casts = [
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
+        'enabled_services' => 'array',
     ];
+
+    /**
+     * Usuário web atual ou User vinculado ao SystemUser autenticado (para permissões de serviço).
+     */
+    public static function currentForServices(): ?self
+    {
+        $u = auth()->user();
+        if ($u instanceof self) {
+            return $u;
+        }
+        $sys = auth()->guard('system')->user();
+        if ($sys instanceof SystemUser && $sys->user_id) {
+            return self::find($sys->user_id);
+        }
+
+        return null;
+    }
+
+    /**
+     * Pode usar um serviço operacional (ex.: checklists em Câmeras).
+     * null em enabled_services = compatível com registros antigos (todos os serviços).
+     */
+    public function canUseService(string $serviceKey): bool
+    {
+        if (! \App\Support\UserService::isValidKey($serviceKey)) {
+            return false;
+        }
+
+        if ($this->hasFullAccess()) {
+            return true;
+        }
+
+        if ($this->userGroup?->full_access) {
+            return true;
+        }
+
+        $enabled = $this->enabled_services;
+        if ($enabled === null) {
+            return true;
+        }
+
+        return in_array($serviceKey, $enabled, true);
+    }
 
     /**
      * Relacionamento com permissões do usuário
@@ -58,6 +104,54 @@ class User extends Authenticatable
     public function systemUser()
     {
         return $this->hasOne(SystemUser::class);
+    }
+
+    public function userGroup()
+    {
+        return $this->belongsTo(UserGroup::class);
+    }
+
+    /**
+     * Pode ver item de menu / rota principal ou admin conforme grupo.
+     */
+    public function canAccessNav(string $key): bool
+    {
+        if ($this->hasFullAccess()) {
+            return true;
+        }
+
+        if ($this->userGroup) {
+            return $this->userGroup->allowsNavKey($key);
+        }
+
+        return false;
+    }
+
+    public function canAccessAnyAdminNav(): bool
+    {
+        if ($this->hasFullAccess()) {
+            return true;
+        }
+
+        if ($this->userGroup?->full_access) {
+            return true;
+        }
+
+        foreach (\App\Support\NavPermission::adminKeys() as $k) {
+            if ($this->canAccessNav($k)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Exibir o menu suspenso "Gerenciar" (pelo menos uma subárea liberada).
+     */
+    public function canSeeGerenciarMenu(): bool
+    {
+        return $this->canAccessAnyAdminNav();
     }
 
     /**

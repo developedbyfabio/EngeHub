@@ -20,6 +20,9 @@ return [
 
     'cameras_delete_history_password' => env('CAMERAS_DELETE_HISTORY_PASSWORD', '@n@lis3'),
 
+    /** Senha para confirmar exclusão de grupo de usuários (tela Grupos e Usuários) */
+    'user_group_delete_password' => env('USER_GROUP_DELETE_PASSWORD', '@n@lis3grup0'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Environment

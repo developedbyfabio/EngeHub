@@ -348,7 +348,7 @@
                                     </div>
                                 </div>
                                 <div id="mapaContainer" class="relative z-0 w-full h-full overflow-hidden cursor-grab" style="touch-action: none; background: #ffffff !important;">
-                                    <div id="svgWrapper" class="inline-block p-4" style="transform-origin: 0 0; will-change: transform; background: #ffffff;">
+                                    <div id="svgWrapper" class="mapa-rede-svg-wrapper inline-block p-4">
                                         <div id="svgContainer" class="svg-map-theme" style="background: #ffffff !important;">
                                             {!! $mapSvgContent !!}
                                         </div>
@@ -624,12 +624,12 @@
     .svg-map-theme [data-code].device:hover { fill: #b45309 !important; }
     .svg-map-theme foreignObject [data-code].device:hover { color: #b45309 !important; }
     .svg-map-theme .device.device-search-highlight {
-        filter: drop-shadow(0 0 3px #E9B32C) drop-shadow(0 0 6px rgba(233, 179, 44, 0.85));
-        transition: filter 0.35s ease;
+        filter: drop-shadow(0 0 1px #E9B32C) drop-shadow(0 0 3px rgba(233, 179, 44, 0.65));
+        transition: filter 0.25s ease;
     }
     .svg-map-theme foreignObject .device.device-search-highlight {
-        box-shadow: 0 0 0 2px #E9B32C, 0 0 12px rgba(233, 179, 44, 0.6);
-        transition: box-shadow 0.35s ease;
+        box-shadow: 0 0 0 2px #E9B32C, 0 0 12px rgba(233, 179, 44, 0.5);
+        transition: box-shadow 0.25s ease;
     }
     .svg-map-theme .device.map-layer-filter-hidden {
         visibility: hidden !important;
@@ -639,7 +639,19 @@
         visibility: hidden !important;
         pointer-events: none !important;
     }
-    #mapaContainer svg { max-width: none !important; height: auto !important; }
+    #mapaContainer svg {
+        max-width: none !important;
+        height: auto !important;
+        text-rendering: geometricPrecision;
+        shape-rendering: geometricPrecision;
+    }
+    #mapaContainer svg text,
+    #mapaContainer svg tspan { text-rendering: geometricPrecision; }
+    #mapaContainer svg image {
+        image-rendering: -webkit-optimize-contrast;
+        image-rendering: crisp-edges;
+    }
+    #svgWrapper.mapa-rede-svg-wrapper { transform-origin: 0 0; }
     #deviceSidePanel.map-device-panel {
         position: absolute;
         right: 0.75rem;

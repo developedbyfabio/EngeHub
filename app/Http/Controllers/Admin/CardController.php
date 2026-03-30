@@ -4,9 +4,10 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Card;
-use App\Models\Tab;
 use App\Models\Category;
 use App\Models\DataCenter;
+use App\Models\Tab;
+use App\Models\UserGroup;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Intervention\Image\ImageManager;
@@ -27,14 +28,15 @@ class CardController extends Controller
         $tabs = Tab::orderBy('order')->get();
         $categories = Category::orderBy('name')->get();
         $datacenters = DataCenter::orderBy('name')->get();
-        
+        $userGroups = UserGroup::orderBy('name')->get();
+
         if (request()->ajax()) {
             return response()->json([
-                'html' => view('admin.cards.create', compact('tabs', 'categories', 'datacenters'))->render()
+                'html' => view('admin.cards.create', compact('tabs', 'categories', 'datacenters', 'userGroups'))->render(),
             ]);
         }
-        
-        return view('admin.cards.create', compact('tabs', 'categories', 'datacenters'));
+
+        return view('admin.cards.create', compact('tabs', 'categories', 'datacenters', 'userGroups'));
     }
 
     public function store(Request $request)
@@ -50,7 +52,9 @@ class CardController extends Controller
             'custom_icon' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:1024',
             'file' => 'nullable|file|mimes:jpeg,png,jpg,gif,pdf|max:2048',
             'monitor_status' => 'boolean',
-            'monitoring_type' => 'required|in:http,ping'
+            'monitoring_type' => 'required|in:http,ping',
+            'user_group_ids' => 'nullable|array',
+            'user_group_ids.*' => 'integer|exists:user_groups,id',
         ]);
 
         $data = $request->all();
@@ -73,6 +77,7 @@ class CardController extends Controller
         }
 
         $card = Card::create($data);
+        $this->syncCardUserGroupsFromRequest($card, $request);
 
         if (request()->ajax()) {
             return response()->json([
@@ -87,17 +92,19 @@ class CardController extends Controller
 
     public function edit(Card $card)
     {
+        $card->load('userGroups');
         $tabs = Tab::orderBy('order')->get();
         $categories = Category::orderBy('name')->get();
         $datacenters = DataCenter::orderBy('name')->get();
-        
+        $userGroups = UserGroup::orderBy('name')->get();
+
         if (request()->ajax()) {
             return response()->json([
-                'html' => view('admin.cards.edit', compact('card', 'tabs', 'categories', 'datacenters'))->render()
+                'html' => view('admin.cards.edit', compact('card', 'tabs', 'categories', 'datacenters', 'userGroups'))->render(),
             ]);
         }
-        
-        return view('admin.cards.edit', compact('card', 'tabs', 'categories', 'datacenters'));
+
+        return view('admin.cards.edit', compact('card', 'tabs', 'categories', 'datacenters', 'userGroups'));
     }
 
     public function update(Request $request, Card $card)
@@ -115,7 +122,9 @@ class CardController extends Controller
             'monitor_status' => 'boolean',
             'monitoring_type' => 'required|in:http,ping',
             'remove_custom_icon' => 'boolean',
-            'remove_file' => 'boolean'
+            'remove_file' => 'boolean',
+            'user_group_ids' => 'nullable|array',
+            'user_group_ids.*' => 'integer|exists:user_groups,id',
         ]);
 
         $data = $request->all();
@@ -156,6 +165,7 @@ class CardController extends Controller
         }
 
         $card->update($data);
+        $this->syncCardUserGroupsFromRequest($card, $request);
 
         if (request()->ajax()) {
             return response()->json([
@@ -166,6 +176,72 @@ class CardController extends Controller
         }
 
         return redirect()->route('admin.cards.index')->with('success', 'Card atualizado com sucesso!');
+    }
+
+    /**
+     * Dados para a matriz cards × grupos (visibilidade no Início).
+     */
+    public function groupPermissionsMatrixData()
+    {
+        $cards = Card::query()
+            ->with(['tab:id,name,color', 'userGroups:id'])
+            ->orderBy('tab_id')
+            ->orderBy('name')
+            ->get(['id', 'name', 'tab_id', 'icon', 'custom_icon_path']);
+
+        $groups = UserGroup::query()->orderBy('name')->get(['id', 'name']);
+
+        return response()->json([
+            'cards' => $cards->map(fn (Card $c) => [
+                'id' => $c->id,
+                'name' => $c->name,
+                'tab_name' => $c->tab?->name ?? '—',
+                'tab_color' => $c->tab?->color ?? '#6366f1',
+                'icon' => $c->icon,
+                'custom_icon_url' => $c->custom_icon_path ? $c->custom_icon_url : null,
+                'group_ids' => $c->userGroups->pluck('id')->values()->all(),
+            ]),
+            'groups' => $groups,
+        ]);
+    }
+
+    /**
+     * Grava a matriz completa de visibilidade (substitui pivôs de todos os cards).
+     */
+    public function syncGroupPermissionsMatrix(Request $request)
+    {
+        $request->validate([
+            'matrix' => 'required|array',
+            'matrix.*' => 'array',
+            'matrix.*.*' => 'integer|exists:user_groups,id',
+        ]);
+
+        $matrix = $request->input('matrix', []);
+
+        foreach (Card::query()->pluck('id') as $cardId) {
+            $cardId = (int) $cardId;
+            $groupIds = $matrix[$cardId] ?? $matrix[(string) $cardId] ?? [];
+            if (! is_array($groupIds)) {
+                $groupIds = [];
+            }
+            $groupIds = array_values(array_unique(array_filter(array_map('intval', $groupIds))));
+            Card::find($cardId)?->userGroups()->sync($groupIds);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Visibilidade dos cards por grupo foi atualizada.',
+        ]);
+    }
+
+    private function syncCardUserGroupsFromRequest(Card $card, Request $request): void
+    {
+        $ids = $request->input('user_group_ids', []);
+        if (! is_array($ids)) {
+            $ids = [];
+        }
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids))));
+        $card->userGroups()->sync($ids);
     }
 
     public function destroy(Card $card)

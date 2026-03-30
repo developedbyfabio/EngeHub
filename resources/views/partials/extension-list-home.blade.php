@@ -40,6 +40,10 @@
                 <span id="extListZoomLabel" class="min-w-[3rem] text-center text-xs font-semibold text-gray-800 tabular-nums sm:text-sm">100%</span>
                 <button type="button" id="extListZoomInBtn" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-100" title="Aumentar zoom">&plus;</button>
                 <button type="button" id="extListZoomResetBtn" class="rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 sm:px-3">Redefinir</button>
+                <label for="extListTeleportChk" class="inline-flex cursor-pointer select-none items-center gap-1.5 whitespace-nowrap rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs font-medium text-gray-700 sm:text-sm" title="Centralizar o resultado com zoom 150% após 3 letras e nas setas">
+                    <input type="checkbox" id="extListTeleportChk" class="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500">
+                    <span>Teleporte:</span>
+                </label>
                 <button type="button" id="extListCloseFullscreenBtn"
                         class="inline-flex items-center gap-1.5 rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-800 sm:px-4">
                     <i class="fas fa-times"></i>
@@ -83,6 +87,7 @@
     var zoomOutBtn = document.getElementById('extListZoomOutBtn');
     var zoomResetBtn = document.getElementById('extListZoomResetBtn');
     var zoomLabel = document.getElementById('extListZoomLabel');
+    var teleportChk = document.getElementById('extListTeleportChk');
 
     var svgRoot = null;
     var searchTargets = [];
@@ -98,6 +103,61 @@
     var mapPanStartX = 0, mapPanStartY = 0;
     var mapPanStartTranslateX = 0, mapPanStartTranslateY = 0;
     var mapRAF = null;
+    var TELEPORT_ZOOM = 1.5;
+    var TELEPORT_MIN_CHARS = 3;
+
+    function isTeleportOn() {
+        return !!(teleportChk && teleportChk.checked);
+    }
+
+    /** Centraliza o bloco destacado (nome + ramal) no mapa com zoom fixo. */
+    function teleportToSearchIndex(idx) {
+        if (!isTeleportOn() || !mapContainer || !wrapEl || !searchMatches.length) return;
+        if (idx < 0) idx = searchMatches.length - 1;
+        if (idx >= searchMatches.length) idx = 0;
+        var primary = searchMatches[idx];
+        var row = expandHighlightRow(primary);
+        var cr = mapContainer.getBoundingClientRect();
+        var minL = Infinity;
+        var minT = Infinity;
+        var maxR = -Infinity;
+        var maxB = -Infinity;
+        var any = false;
+        row.forEach(function(el) {
+            try {
+                var r = el.getBoundingClientRect();
+                if (r.width < 0.25 && r.height < 0.25) return;
+                any = true;
+                minL = Math.min(minL, r.left);
+                minT = Math.min(minT, r.top);
+                maxR = Math.max(maxR, r.right);
+                maxB = Math.max(maxB, r.bottom);
+            } catch (e) {}
+        });
+        if (!any || !isFinite(minL)) return;
+
+        var mx = (minL + maxR) / 2 - cr.left;
+        var my = (minT + maxB) / 2 - cr.top;
+        var S = TELEPORT_ZOOM;
+        var contentX = (mx - mapTranslateX) / mapZoomLevel;
+        var contentY = (my - mapTranslateY) / mapZoomLevel;
+        var contCx = cr.width / 2;
+        var contCy = cr.height / 2;
+        mapTranslateX = contCx - contentX * S;
+        mapTranslateY = contCy - contentY * S;
+        mapZoomLevel = S;
+        mapApplyTransform();
+    }
+
+    function scheduleTeleportToIndex(idx) {
+        if (!isTeleportOn() || !searchMatches.length) return;
+        requestAnimationFrame(function() {
+            requestAnimationFrame(function() {
+                teleportToSearchIndex(idx);
+            });
+        });
+    }
+
     function normalizeSearch(s) {
         return String(s || '')
             .toLowerCase()
@@ -148,6 +208,95 @@
         return (el.textContent || '').replace(/\s+/g, ' ').trim();
     }
 
+    /** Ramal / telefone curto só dígitos (mesma linha que o nome em muitos SVG). */
+    function isExtensionLike(str) {
+        var t = String(str || '').replace(/\s/g, '');
+        return /^[\d\-]{3,8}$/.test(t);
+    }
+
+    /**
+     * Inclui na marcação o mesmo "texto SVG" da linha: todos os tspan do bloco text,
+     * e — se o ramal estiver em outro &lt;text&gt; irmão — esse trecho também.
+     */
+    function mergeSiblingExtensionTexts(textEl, add) {
+        var container = textEl.parentElement;
+        if (!container) return;
+        var box;
+        try {
+            box = textEl.getBBox();
+        } catch (e) {
+            return;
+        }
+        var ay = box.y + box.height / 2;
+        var rightEdge = box.x + box.width;
+
+        [].forEach.call(container.children, function(child) {
+            if (child === textEl) return;
+            var cn = (child.localName || '').toLowerCase();
+            if (cn !== 'text') return;
+            try {
+                var b = child.getBBox();
+                var ly = b.y + b.height / 2;
+                if (Math.abs(ly - ay) > 6) return;
+                var raw = (child.textContent || '').trim();
+                var txt = raw.replace(/\s/g, '');
+                var subs = child.querySelectorAll('tspan');
+                if (isExtensionLike(txt) || b.x >= rightEdge - 8) {
+                    if (subs.length) {
+                        [].forEach.call(subs, function(ts) {
+                            if (isLeafTextGraphic(ts)) add(ts);
+                        });
+                    } else {
+                        add(child);
+                    }
+                }
+            } catch (e2) {}
+        });
+    }
+
+    function expandHighlightRow(el) {
+        var out = [];
+        var seen = Object.create(null);
+        function add(e) {
+            if (!e || seen[e]) return;
+            seen[e] = true;
+            out.push(e);
+        }
+        if (!el) return out;
+
+        var localName = (el.localName || '').toLowerCase();
+        if (localName === 'foreignobject') {
+            add(el);
+            return out;
+        }
+
+        if (localName === 'tspan') {
+            var p = el.parentNode;
+            if (p && (p.localName || '').toLowerCase() === 'text') {
+                var tspans = p.querySelectorAll('tspan');
+                [].forEach.call(tspans, add);
+                if (tspans.length <= 1) {
+                    mergeSiblingExtensionTexts(p, add);
+                }
+                return out;
+            }
+        }
+
+        if (localName === 'text') {
+            var subs = el.querySelectorAll('tspan');
+            if (subs.length) {
+                [].forEach.call(subs, add);
+            } else {
+                add(el);
+                mergeSiblingExtensionTexts(el, add);
+            }
+            return out;
+        }
+
+        add(el);
+        return out;
+    }
+
     function clearSearchHighlightClasses() {
         if (!svgRoot) return;
         svgRoot.querySelectorAll('.ext-list-svg-hit, .ext-list-svg-active').forEach(function(n) {
@@ -157,11 +306,16 @@
 
     function applySearchHighlightClasses() {
         clearSearchHighlightClasses();
-        searchMatches.forEach(function(el) {
-            el.classList.add('ext-list-svg-hit');
+        searchMatches.forEach(function(primary) {
+            expandHighlightRow(primary).forEach(function(n) {
+                n.classList.add('ext-list-svg-hit');
+            });
         });
-        if (searchMatches[searchIndex]) {
-            searchMatches[searchIndex].classList.add('ext-list-svg-active');
+        var cur = searchMatches[searchIndex];
+        if (cur) {
+            expandHighlightRow(cur).forEach(function(n) {
+                n.classList.add('ext-list-svg-active');
+            });
         }
     }
 
@@ -225,7 +379,7 @@
         });
     }
 
-    /** Apenas alterna o realce “ativo” entre ocorrências, sem mover o mapa. */
+    /** Alterna o realce; com Teleporte ativo, centraliza a linha a 150%. */
     function focusSearchResult(index) {
         if (!searchMatches.length) return;
         if (index < 0) index = searchMatches.length - 1;
@@ -233,6 +387,9 @@
         searchIndex = index;
         applySearchHighlightClasses();
         updateSearchStatusUI();
+        if (isTeleportOn()) {
+            scheduleTeleportToIndex(searchIndex);
+        }
     }
 
     function updateSearchStatusUI() {
@@ -272,14 +429,14 @@
             searchFeedback.textContent = 'Nenhum resultado encontrado';
             searchFeedback.classList.remove('hidden');
             updateSearchStatusUI();
-            if (typeof window.showToast === 'function') {
-                window.showToast('Nenhum resultado encontrado para esta busca.', 'warning', 3500);
-            }
             return;
         }
         searchIndex = 0;
         applySearchHighlightClasses();
         updateSearchStatusUI();
+        if (isTeleportOn() && qRaw.length >= TELEPORT_MIN_CHARS) {
+            scheduleTeleportToIndex(0);
+        }
     }
 
     function showToastSafe(msg, type, ms) {
@@ -376,6 +533,16 @@
     }
     if (searchPrev) searchPrev.addEventListener('click', function() { focusSearchResult(searchIndex - 1); });
     if (searchNext) searchNext.addEventListener('click', function() { focusSearchResult(searchIndex + 1); });
+
+    if (teleportChk) {
+        teleportChk.addEventListener('change', function() {
+            if (!isTeleportOn() || !searchInput) return;
+            var raw = String(searchInput.value || '').trim();
+            if (raw.length >= TELEPORT_MIN_CHARS && searchMatches.length) {
+                scheduleTeleportToIndex(searchIndex);
+            }
+        });
+    }
 
     if (zoomInBtn) zoomInBtn.addEventListener('click', function() {
         if (!mapContainer) return;

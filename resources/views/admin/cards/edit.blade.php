@@ -31,6 +31,8 @@
         <x-input-error :messages="$errors->get('monitoring_type')" class="mt-2" />
     </div>
 
+    @include('admin.cards._user_groups_visibility', ['userGroups' => $userGroups, 'selectedGroupIds' => old('user_group_ids', $card->userGroups->pluck('id')->all())])
+
     <div>
         <x-input-label for="tab_id" :value="__('Aba/Categoria')" />
         <select id="tab_id" name="tab_id" class="border-gray-300 focus:border-primary-500 focus:ring-primary-500 rounded-md shadow-sm block mt-1 w-full" required>

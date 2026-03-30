@@ -3,11 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Models\Dvr;
+use App\Models\DvrFoto;
 use App\Models\Camera;
 use App\Models\CameraChecklist;
 use App\Models\CameraChecklistItem;
 use App\Models\CameraChecklistAnexo;
+use App\Models\User;
+use App\Support\UserService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Barryvdh\DomPDF\Facade\Pdf;
 
@@ -18,13 +22,53 @@ class CameraController extends Controller
      */
     public function index(Request $request)
     {
-        $dvrs = Dvr::with(['cameras' => fn ($q) => $q->whereIn('status', [Camera::STATUS_ATIVO, Camera::STATUS_AGUARDANDO_CORRECAO])->orderBy('ordem')->orderBy('created_at')])
+        $dvrs = Dvr::with([
+            'cameras' => fn ($q) => $q->whereIn('status', [Camera::STATUS_ATIVO, Camera::STATUS_AGUARDANDO_CORRECAO])->orderBy('ordem')->orderBy('created_at'),
+            'fotos' => fn ($q) => $q->orderByDesc('created_at'),
+        ])
             ->withCount(['cameras' => fn ($q) => $q->whereIn('status', [Camera::STATUS_ATIVO, Camera::STATUS_AGUARDANDO_CORRECAO])])
             ->where('status', 'ativo')
             ->orderBy('nome')
             ->get();
 
+        $camerasFlatList = [];
+        $dvrFotosViewerFlat = [];
+        foreach ($dvrs as $d) {
+            $ultimaFotoDvr = $d->fotos->sortByDesc(fn ($f) => $f->created_at->timestamp)->first();
+            if ($ultimaFotoDvr) {
+                $dvrFotosViewerFlat[] = [
+                    'dvrId' => $d->id,
+                    'dvrNome' => $d->nome,
+                    'fotoUrl' => asset('storage/'.$ultimaFotoDvr->path),
+                    'data' => $ultimaFotoDvr->created_at->format('d/m/Y H:i'),
+                ];
+            }
+            foreach ($d->cameras as $c) {
+                $camerasFlatList[] = [
+                    'dvrId' => $d->id,
+                    'dvrNome' => $d->nome,
+                    'cameraId' => $c->id,
+                    'cameraNome' => $c->nome,
+                    'fotoUrl' => $c->foto ? asset('storage/'.$c->foto) : null,
+                ];
+            }
+        }
+
+        $cameraIds = $dvrs->pluck('cameras')->flatten()->pluck('id')->unique()->filter()->values();
+        $problemaHistoricoPorCamera = CameraChecklistItem::where(function ($q) {
+            $q->where('problema', true)
+                ->orWhereNotNull('descricao_problema')
+                ->orWhereNotNull('acao_corretiva_necessaria')
+                ->orWhereNotNull('acao_corretiva_realizada');
+        })
+            ->whereIn('camera_id', $cameraIds->isEmpty() ? [0] : $cameraIds)
+            ->with('cameraChecklist')
+            ->orderByDesc('created_at')
+            ->get()
+            ->groupBy('camera_id');
+
         $userId = auth()->check() ? auth()->user()->id : null;
+        $canUseCameraChecklist = User::currentForServices()?->canUseService(UserService::CHECKLIST_CAMERAS) ?? false;
 
         // Excluir checklists em andamento com mais de 9 horas
         $limite = now()->subHours(9);
@@ -32,13 +76,15 @@ class CameraController extends Controller
             ->where('iniciado_em', '<', $limite)
             ->each(fn ($c) => $c->delete());
 
-        $checklistsEmAndamento = CameraChecklist::where('status', 'em_andamento')
-            ->when($userId, fn ($q) => $q->where('user_id', $userId))
-            ->when(!$userId, fn ($q) => $q->whereNull('user_id'))
-            ->with(['dvr', 'dvrs'])
-            ->orderByDesc('iniciado_em')
-            ->limit(10)
-            ->get();
+        $checklistsEmAndamento = $canUseCameraChecklist
+            ? CameraChecklist::where('status', 'em_andamento')
+                ->when($userId, fn ($q) => $q->where('user_id', $userId))
+                ->when(! $userId, fn ($q) => $q->whereNull('user_id'))
+                ->with(['dvr', 'dvrs'])
+                ->orderByDesc('iniciado_em')
+                ->limit(10)
+                ->get()
+            : collect();
 
         // Histórico: checklists finalizados com filtros
         $period = $request->get('period', 'week');
@@ -64,7 +110,20 @@ class CameraController extends Controller
 
         $checklistsFinalizados = $checklistsQuery->limit(50)->get();
 
-        return view('cameras.index', compact('dvrs', 'checklistsEmAndamento', 'checklistsFinalizados', 'period', 'dvrFilter'));
+        $checklistsModalOpen = $request->boolean('checklists_open');
+
+        return view('cameras.index', compact(
+            'dvrs',
+            'checklistsEmAndamento',
+            'checklistsFinalizados',
+            'period',
+            'dvrFilter',
+            'camerasFlatList',
+            'dvrFotosViewerFlat',
+            'problemaHistoricoPorCamera',
+            'checklistsModalOpen',
+            'canUseCameraChecklist'
+        ));
     }
 
     /**
@@ -72,6 +131,10 @@ class CameraController extends Controller
      */
     public function storeChecklist(Request $request)
     {
+        if (! $this->userCanUseCameraChecklistService()) {
+            return $this->denyChecklistService($request);
+        }
+
         $validated = $request->validate([
             'dvr_ids' => 'required|array',
             'dvr_ids.*' => 'required|integer|exists:dvrs,id',
@@ -130,6 +193,10 @@ class CameraController extends Controller
      */
     public function apagarHistorico(Request $request)
     {
+        if (! $this->userCanUseCameraChecklistService()) {
+            return $this->denyChecklistService($request);
+        }
+
         $senha = $request->input('senha');
         $senhaCorreta = config('app.cameras_delete_history_password');
 
@@ -137,21 +204,15 @@ class CameraController extends Controller
             return response()->json(['success' => false, 'message' => 'Senha incorreta.'], 422);
         }
 
-        $apagados = CameraChecklist::whereIn('status', [
+        $lista = CameraChecklist::whereIn('status', [
             CameraChecklist::STATUS_FINALIZADO,
             CameraChecklist::STATUS_CANCELADO,
-        ])->count();
+        ])->get();
 
-        foreach (CameraChecklist::whereIn('status', [
-            CameraChecklist::STATUS_FINALIZADO,
-            CameraChecklist::STATUS_CANCELADO,
-        ])->get() as $checklist) {
-            $checklist->itens()->delete();
-            $checklist->anexos()->each(function ($anexo) {
-                \Storage::disk('public')->delete($anexo->caminho_arquivo);
-            });
-            $checklist->anexos()->delete();
-            $checklist->delete();
+        $apagados = $lista->count();
+
+        foreach ($lista as $checklist) {
+            $this->excluirChecklistComAnexos($checklist);
         }
 
         $message = $apagados === 1
@@ -169,10 +230,67 @@ class CameraController extends Controller
     }
 
     /**
+     * Apagar um único checklist finalizado ou cancelado (mesma senha do histórico global).
+     */
+    public function apagarHistoricoItem(Request $request, CameraChecklist $checklist)
+    {
+        if (! $this->userCanUseCameraChecklistService()) {
+            return $this->denyChecklistService($request);
+        }
+
+        if (! in_array($checklist->status, [
+            CameraChecklist::STATUS_FINALIZADO,
+            CameraChecklist::STATUS_CANCELADO,
+        ], true)) {
+            return response()->json(['success' => false, 'message' => 'Só é possível apagar checklists finalizados ou cancelados.'], 422);
+        }
+
+        $senha = $request->input('senha');
+        $senhaCorreta = config('app.cameras_delete_history_password');
+
+        if ($senha !== $senhaCorreta) {
+            return response()->json(['success' => false, 'message' => 'Senha incorreta.'], 422);
+        }
+
+        $this->excluirChecklistComAnexos($checklist);
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Checklist removido do histórico.',
+            ]);
+        }
+
+        return redirect()->route('cameras.index')->with('success', 'Checklist removido do histórico.');
+    }
+
+    /**
+     * Remove itens, anexos em disco, anexos e o registro do checklist.
+     */
+    private function excluirChecklistComAnexos(CameraChecklist $checklist): void
+    {
+        $checklist->loadMissing('anexos');
+        foreach ($checklist->anexos as $anexo) {
+            Storage::disk('public')->delete($anexo->caminho_arquivo);
+        }
+        $checklist->itens()->delete();
+        $checklist->anexos()->delete();
+        $checklist->delete();
+    }
+
+    /**
      * Exibir/continuar checklist.
      */
     public function showChecklist(CameraChecklist $checklist)
     {
+        if ($checklist->status !== CameraChecklist::STATUS_EM_ANDAMENTO) {
+            return redirect()->route('cameras.checklists.detalhes', $checklist);
+        }
+
+        if (! $this->userCanUseCameraChecklistService()) {
+            abort(403);
+        }
+
         $checklist->load(['itens.camera.dvr', 'dvr', 'dvrs', 'anexos.dvr']);
         $itensPorDvr = $checklist->itens->groupBy(fn ($i) => $i->camera->dvr_id);
 
@@ -227,6 +345,10 @@ class CameraController extends Controller
      */
     public function storeItem(Request $request, CameraChecklist $checklist)
     {
+        if (! $this->userCanUseCameraChecklistService()) {
+            return $this->denyChecklistService($request);
+        }
+
         if ($checklist->status !== CameraChecklist::STATUS_EM_ANDAMENTO) {
             return response()->json(['success' => false, 'message' => 'Checklist já finalizado ou cancelado.'], 422);
         }
@@ -264,25 +386,33 @@ class CameraController extends Controller
      */
     public function finalizarChecklist(Request $request, CameraChecklist $checklist)
     {
+        if (! $this->userCanUseCameraChecklistService()) {
+            return $this->denyChecklistService($request);
+        }
+
         if ($checklist->status !== CameraChecklist::STATUS_EM_ANDAMENTO) {
             return response()->json(['success' => false, 'message' => 'Checklist já finalizado ou cancelado.'], 422);
         }
 
-        $checklist->update([
-            'status' => CameraChecklist::STATUS_FINALIZADO,
-            'finalizado_em' => now(),
-            'observacoes_gerais' => $request->input('observacoes_gerais'),
-        ]);
+        DB::transaction(function () use ($request, $checklist) {
+            $checklist->update([
+                'status' => CameraChecklist::STATUS_FINALIZADO,
+                'finalizado_em' => now(),
+                'observacoes_gerais' => $request->input('observacoes_gerais'),
+            ]);
 
-        $itensComProblema = $checklist->itens()
-            ->where('problema', true)
-            ->whereNotNull('acao_corretiva_necessaria')
-            ->where('acao_corretiva_necessaria', '!=', '')
-            ->pluck('camera_id')
-            ->unique();
-        if ($itensComProblema->isNotEmpty()) {
-            Camera::whereIn('id', $itensComProblema)->update(['status' => Camera::STATUS_AGUARDANDO_CORRECAO]);
-        }
+            $itensComProblema = $checklist->itens()
+                ->where('problema', true)
+                ->whereNotNull('acao_corretiva_necessaria')
+                ->where('acao_corretiva_necessaria', '!=', '')
+                ->pluck('camera_id')
+                ->unique();
+            if ($itensComProblema->isNotEmpty()) {
+                Camera::whereIn('id', $itensComProblema)->update(['status' => Camera::STATUS_AGUARDANDO_CORRECAO]);
+            }
+
+            $this->promoverEvidenciasDvrChecklistParaFotos($checklist);
+        });
 
         if ($request->wantsJson()) {
             return response()->json([
@@ -295,10 +425,76 @@ class CameraController extends Controller
     }
 
     /**
+     * Copia evidências de imagem anexadas ao DVR no checklist para dvr_fotos
+     * (foto principal + histórico em Gerenciar Câmeras). Não remove anexos do checklist.
+     */
+    private function promoverEvidenciasDvrChecklistParaFotos(CameraChecklist $checklist): void
+    {
+        $anexosDvr = CameraChecklistAnexo::query()
+            ->where('camera_checklist_id', $checklist->id)
+            ->whereNotNull('dvr_id')
+            ->whereNull('camera_id')
+            ->orderBy('id')
+            ->get();
+
+        $disk = Storage::disk('public');
+
+        foreach ($anexosDvr as $anexo) {
+            if (! $this->checklistAnexoEhImagemDvr($anexo)) {
+                continue;
+            }
+            if (! $disk->exists($anexo->caminho_arquivo)) {
+                continue;
+            }
+
+            $ext = strtolower(pathinfo($anexo->caminho_arquivo, PATHINFO_EXTENSION) ?: 'jpg');
+            if (! in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true)) {
+                continue;
+            }
+
+            $dest = 'dvr-fotos/chk-'.$checklist->id.'-anexo-'.$anexo->id.'.'.$ext;
+            if ($disk->exists($dest)) {
+                $dest = 'dvr-fotos/chk-'.$checklist->id.'-anexo-'.$anexo->id.'-'.uniqid().'.'.$ext;
+            }
+
+            if (! $disk->copy($anexo->caminho_arquivo, $dest)) {
+                continue;
+            }
+
+            DvrFoto::create([
+                'dvr_id' => $anexo->dvr_id,
+                'disk' => 'public',
+                'path' => $dest,
+                'original_filename' => $anexo->nome_original,
+                'user_id' => $checklist->user_id,
+            ]);
+        }
+    }
+
+    private function checklistAnexoEhImagemDvr(CameraChecklistAnexo $anexo): bool
+    {
+        $mime = strtolower((string) $anexo->tipo_arquivo);
+        if ($mime !== '' && (str_contains($mime, 'pdf') || str_starts_with($mime, 'application/pdf'))) {
+            return false;
+        }
+        if ($mime !== '' && str_starts_with($mime, 'image/')) {
+            return true;
+        }
+
+        $ext = strtolower(pathinfo($anexo->caminho_arquivo, PATHINFO_EXTENSION));
+
+        return in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true);
+    }
+
+    /**
      * Cancelar checklist.
      */
     public function cancelarChecklist(CameraChecklist $checklist)
     {
+        if (! $this->userCanUseCameraChecklistService()) {
+            return $this->denyChecklistService(request());
+        }
+
         if ($checklist->status !== CameraChecklist::STATUS_EM_ANDAMENTO) {
             return response()->json(['success' => false, 'message' => 'Checklist já finalizado ou cancelado.'], 422);
         }
@@ -323,6 +519,10 @@ class CameraController extends Controller
      */
     public function storeAnexo(Request $request, CameraChecklist $checklist)
     {
+        if (! $this->userCanUseCameraChecklistService()) {
+            return $this->denyChecklistService($request);
+        }
+
         if ($checklist->status !== CameraChecklist::STATUS_EM_ANDAMENTO) {
             return response()->json(['success' => false, 'message' => 'Checklist já finalizado ou cancelado.'], 422);
         }
@@ -351,6 +551,10 @@ class CameraController extends Controller
      */
     public function storeSolucao(Request $request, CameraChecklist $checklist)
     {
+        if (! $this->userCanUseCameraChecklistService()) {
+            return $this->denyChecklistService($request);
+        }
+
         if ($checklist->status !== CameraChecklist::STATUS_EM_ANDAMENTO) {
             return response()->json(['success' => false, 'message' => 'Checklist já finalizado ou cancelado.'], 422);
         }
@@ -409,6 +613,10 @@ class CameraController extends Controller
      */
     public function destroyAnexo(CameraChecklist $checklist, CameraChecklistAnexo $anexo)
     {
+        if (! $this->userCanUseCameraChecklistService()) {
+            return $this->denyChecklistService(request());
+        }
+
         if ($anexo->camera_checklist_id !== $checklist->id) {
             abort(404);
         }
@@ -427,6 +635,10 @@ class CameraController extends Controller
      */
     public function limparHistoricoItem(Request $request, CameraChecklist $checklist, CameraChecklistItem $item)
     {
+        if (! $this->userCanUseCameraChecklistService()) {
+            return $this->denyChecklistService($request);
+        }
+
         $senha = $request->input('senha');
         $senhaCorreta = config('app.cameras_delete_history_password');
         if ($senha !== $senhaCorreta) {
@@ -490,5 +702,25 @@ class CameraController extends Controller
         $dvrNome = ($mostrarTodosDvrs ?? false) ? 'todos-os-dvrs' : ($checklist->dvrs->count() > 0 ? $checklist->dvrs->pluck('nome')->join('-') : ($checklist->dvr?->nome ?? 'checklist'));
         $fileName = 'checklist-' . \Str::slug($dvrNome) . '-' . $checklist->finalizado_em?->format('Y-m-d') . '.pdf';
         return $pdf->download($fileName);
+    }
+
+    private function userCanUseCameraChecklistService(): bool
+    {
+        return User::currentForServices()?->canUseService(UserService::CHECKLIST_CAMERAS) ?? false;
+    }
+
+    /**
+     * @return \Illuminate\Http\JsonResponse|\Symfony\Component\HttpFoundation\Response
+     */
+    private function denyChecklistService(Request $request)
+    {
+        if ($request->expectsJson() || $request->wantsJson()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Sem permissão para usar checklists de câmeras.',
+            ], 403);
+        }
+
+        abort(403, 'Sem permissão para usar checklists de câmeras.');
     }
 }

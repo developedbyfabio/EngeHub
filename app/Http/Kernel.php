@@ -74,6 +74,7 @@ class Kernel extends HttpKernel
         'force.logout' => \App\Http\Middleware\ForceLogoutAfterSession::class,
         'public.auth' => \App\Http\Middleware\PublicAccessWithAuthCheck::class,
         'admin.access' => \App\Http\Middleware\CheckAdminAccess::class,
+        'nav.access' => \App\Http\Middleware\EnsureWebUserNavAccess::class,
         'secret.url' => \App\Http\Middleware\CheckSecretUrl::class,
     ];
 } 

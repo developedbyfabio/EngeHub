@@ -14,7 +14,23 @@
 @section('content')
     @php
         $camerasFlatList = [];
+        $dvrFotosByDvrId = [];
+        $dvrFotosViewerFlat = [];
         foreach ($dvrs ?? [] as $d) {
+            $dvrFotosByDvrId[$d->id] = $d->fotos->map(fn($f) => [
+                'fotoUrl' => asset('storage/' . $f->path),
+                'data' => $f->created_at->format('d/m/Y H:i'),
+                'dvrNome' => $d->nome,
+            ])->values()->all();
+            $ultimaFotoDvr = $d->fotos->sortByDesc(fn($f) => $f->created_at->timestamp)->first();
+            if ($ultimaFotoDvr) {
+                $dvrFotosViewerFlat[] = [
+                    'dvrId' => $d->id,
+                    'dvrNome' => $d->nome,
+                    'fotoUrl' => asset('storage/' . $ultimaFotoDvr->path),
+                    'data' => $ultimaFotoDvr->created_at->format('d/m/Y H:i'),
+                ];
+            }
             foreach ($d->cameras ?? [] as $c) {
                 $camerasFlatList[] = [
                     'dvrId' => $d->id,
@@ -41,6 +57,7 @@
                                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th>
                                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Localização</th>
                                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Câmeras</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Foto</th>
                                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
                                     </tr>
@@ -48,6 +65,15 @@
                                 <tbody class="bg-white divide-y divide-gray-200">
                                     @php $viewerIdx = 0; @endphp
                                     @foreach($dvrs as $dvr)
+                                        @php
+                                            $dvrFotoHistArr = $dvr->fotos->map(fn($f) => [
+                                                'id' => $f->id,
+                                                'data' => $f->created_at->format('d/m/Y H:i'),
+                                                'arquivo' => $f->original_filename ?: basename($f->path),
+                                                'url' => asset('storage/' . $f->path),
+                                                'dvrNome' => $dvr->nome,
+                                            ])->values()->all();
+                                        @endphp
                                         <tr data-dvr-id="{{ $dvr->id }}" class="bg-white hover:bg-gray-50">
                                             <td class="px-4 py-3 whitespace-nowrap">
                                                 <button type="button" onclick="toggleDvrExpand({{ $dvr->id }})" class="text-gray-500 hover:text-gray-700 focus:outline-none" title="Expandir/recolher">
@@ -60,10 +86,22 @@
                                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">{{ $dvr->cameras->count() }} câmeras</span>
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                                @if($dvr->fotos->isNotEmpty())
+                                                    @php $dvrThumbFoto = $dvr->fotos->sortByDesc(fn($f) => $f->created_at->timestamp)->first(); @endphp
+                                                    <button type="button" onclick="openDvrFotoViewer({{ $dvr->id }})" class="cursor-pointer hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-1 rounded" title="Clique para visualizar (Próxima/Anterior troca de DVR)">
+                                                        <img src="{{ asset('storage/' . $dvrThumbFoto->path) }}" alt="Foto do DVR {{ $dvr->nome }}" class="h-10 w-auto rounded border border-gray-300 object-cover">
+                                                    </button>
+                                                @else
+                                                    <span class="text-gray-400">-</span>
+                                                @endif
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm">
                                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $dvr->status === 'ativo' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800' }}">{{ ucfirst($dvr->status) }}</span>
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                                 <div class="flex space-x-2">
+                                                    <button type="button" class="btn-dvr-foto text-purple-600 hover:text-purple-900" title="Anexar foto do DVR" data-dvr-id="{{ $dvr->id }}" data-dvr-nome="{{ e($dvr->nome) }}"><i class="fas fa-camera"></i></button>
+                                                    <button type="button" class="btn-historico-dvr text-indigo-600 hover:text-indigo-900" title="Histórico de fotos do DVR" data-dvr-id="{{ $dvr->id }}" data-dvr-nome="{{ e($dvr->nome) }}" data-historical="{{ base64_encode(json_encode($dvrFotoHistArr, JSON_UNESCAPED_UNICODE)) }}"><i class="fas fa-history"></i></button>
                                                     @if(!empty($dvr->acesso_web) && (str_starts_with($dvr->acesso_web, 'http://') || str_starts_with($dvr->acesso_web, 'https://')))
                                                         <a href="{{ e($dvr->acesso_web) }}" target="_blank" rel="noopener noreferrer" class="text-green-600 hover:text-green-900" title="Abrir acesso web do DVR"><i class="fas fa-globe"></i></a>
                                                     @endif
@@ -75,7 +113,7 @@
                                         </tr>
                                         {{-- Linhas das câmeras (ocultas por padrão) --}}
                                         <tr data-dvr-cameras="{{ $dvr->id }}" class="dvr-cameras-row hidden bg-gray-50">
-                                            <td colspan="6" class="px-6 py-0">
+                                            <td colspan="7" class="px-6 py-0">
                                                 <div class="border-l-4 border-blue-200 pl-4 py-3">
                                                     <div class="flex items-center justify-between mb-2">
                                                         <span class="text-sm font-medium text-gray-700">Câmeras do DVR {{ $dvr->nome }}</span>
@@ -248,6 +286,99 @@
         </div>
     </div>
 
+    {{-- Modal visualizador de fotos do DVR (navega só entre fotos deste DVR) --}}
+    <div id="dvrFotoViewerModal" class="fixed inset-0 bg-gray-900 bg-opacity-90 overflow-y-auto h-full w-full hidden flex items-center justify-center p-4" style="z-index: 100000;">
+        <div class="relative bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center p-4 border-b border-gray-200 bg-gray-50 rounded-t-lg">
+                <div>
+                    <p id="dvrFotoViewerContextHint" class="text-xs font-medium text-indigo-600 mb-1 hidden">Histórico deste DVR</p>
+                    <h3 class="text-sm font-medium text-gray-500">DVR</h3>
+                    <p id="dvrFotoViewerDvrName" class="text-lg font-semibold text-gray-900"></p>
+                    <h3 class="text-sm font-medium text-gray-500 mt-2">Data da foto</h3>
+                    <p id="dvrFotoViewerDataLabel" class="text-base font-medium text-gray-800"></p>
+                </div>
+                <button type="button" onclick="closeDvrFotoViewer()" class="text-gray-400 hover:text-gray-600 p-2">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="flex-1 flex items-center justify-center p-6 bg-gray-100 min-h-[300px]">
+                <div id="dvrFotoViewerImageWrap" class="relative">
+                    <img id="dvrFotoViewerImage" src="" alt="" class="max-w-full max-h-[60vh] object-contain rounded-lg shadow-lg">
+                </div>
+            </div>
+            <div class="flex justify-between items-center p-4 border-t border-gray-200 bg-gray-50 rounded-b-lg">
+                <button type="button" id="dvrFotoViewerBtnPrev" onclick="dvrFotoViewerPrev()" title="Anterior" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium">
+                    <i class="fas fa-chevron-left mr-2"></i>Anterior
+                </button>
+                <span id="dvrFotoViewerCounter" class="text-sm text-gray-600"></span>
+                <button type="button" id="dvrFotoViewerBtnNext" onclick="dvrFotoViewerNext()" title="Próxima" class="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium">
+                    Próxima<i class="fas fa-chevron-right ml-2"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    {{-- Modal anexar foto do DVR --}}
+    <div id="dvrFotoModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden flex items-center justify-center p-4" style="z-index: 99999;">
+        <div class="w-full max-w-md shadow-lg rounded-md bg-white my-4">
+            <div class="flex justify-between items-center px-6 py-4 border-b border-gray-200">
+                <h3 class="text-lg font-medium text-gray-900"><i class="fas fa-camera text-purple-600 mr-2"></i>Anexar foto do DVR</h3>
+                <button type="button" onclick="closeDvrFotoModal()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times text-xl"></i></button>
+            </div>
+            <div class="px-6 py-4">
+                <p class="text-sm text-gray-600 mb-4">DVR: <span id="dvrFotoModalDvrNome" class="font-medium text-gray-900"></span></p>
+                <form id="dvrFotoForm" enctype="multipart/form-data">
+                    @csrf
+                    <div class="mb-4">
+                        <label for="dvrFotoInput" class="block text-sm font-medium text-gray-700 mb-1">Imagem</label>
+                        <input type="file" name="foto" id="dvrFotoInput" accept="image/jpeg,image/png,image/gif,image/webp" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100" required>
+                        <p class="text-xs text-gray-500 mt-1">JPEG, PNG, GIF ou WebP, até 5 MB. Cada envio fica no histórico.</p>
+                    </div>
+                    <div id="dvrFotoFormError" class="text-sm text-red-600 mb-3 hidden"></div>
+                    <div class="flex justify-end gap-2">
+                        <button type="button" onclick="closeDvrFotoModal()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300">Cancelar</button>
+                        <button type="submit" id="dvrFotoSubmitBtn" class="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700">Enviar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    {{-- Modal confirmar exclusão de foto do histórico do DVR --}}
+    <div id="excluirDvrFotoModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden flex items-center justify-center p-4" style="z-index: 100001;">
+        <div class="w-full max-w-md shadow-lg rounded-md bg-white my-4">
+            <div class="flex justify-between items-center px-6 py-4 border-b border-gray-200">
+                <h3 class="text-lg font-medium text-gray-900"><i class="fas fa-trash-alt mr-2 text-red-600"></i>Remover foto do histórico</h3>
+                <button type="button" onclick="closeExcluirDvrFotoModal()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times text-xl"></i></button>
+            </div>
+            <div class="px-6 py-4">
+                <p class="text-sm text-gray-600 mb-4">Esta ação apaga o arquivo e o registro. Digite a senha para confirmar:</p>
+                <input type="password" id="excluirDvrFotoSenha" placeholder="Senha" class="block w-full border-gray-300 rounded-md shadow-sm mb-4" autocomplete="off">
+                <p id="excluirDvrFotoErro" class="text-red-500 text-sm mb-4 hidden"></p>
+                <div class="flex justify-end gap-2">
+                    <button type="button" onclick="closeExcluirDvrFotoModal()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300">Cancelar</button>
+                    <button type="button" onclick="confirmarExcluirDvrFoto()" class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 font-medium">Remover</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Modal histórico de fotos do DVR --}}
+    <div id="historicoDvrModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden flex items-center justify-center p-4" style="z-index: 99990;">
+        <div class="w-full max-w-2xl shadow-lg rounded-md bg-white my-4 max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center px-6 py-4 border-b border-gray-200">
+                <h3 class="text-lg font-medium text-gray-900"><i class="fas fa-images text-indigo-600 mr-2"></i><span id="historicoDvrModalTitulo">Fotos do DVR</span></h3>
+                <button type="button" onclick="closeHistoricoDvrModal()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times text-xl"></i></button>
+            </div>
+            <div class="flex-1 overflow-y-auto px-6 py-4">
+                <ul id="historicoDvrModalLista" class="space-y-4"></ul>
+            </div>
+            <div class="px-6 py-4 border-t border-gray-200">
+                <button type="button" onclick="closeHistoricoDvrModal()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300">Fechar</button>
+            </div>
+        </div>
+    </div>
+
     {{-- Modal Histórico de Problemas da Câmera --}}
     <div id="historicoCameraModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden flex items-center justify-center p-4" style="z-index: 99999;">
         <div class="w-full max-w-2xl shadow-lg rounded-md bg-white my-4 max-h-[90vh] flex flex-col">
@@ -300,8 +431,19 @@
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
         const baseUrl = '{{ url("/admin/cameras") }}';
         const camerasList = @json($camerasFlatList);
+        const dvrFotosByDvrId = @json($dvrFotosByDvrId);
+        const dvrFotosViewerFlat = @json($dvrFotosViewerFlat);
 
         let cameraViewerCurrentIndex = 0;
+        let dvrFotoViewerIndex = 0;
+        let dvrFotoViewerMode = 'cross';
+        let dvrFotoViewerHistoricoList = [];
+        let historicoDvrContext = { dvrId: null, nome: '', historical: [] };
+        let excluirDvrFotoContext = { dvrId: null, fotoId: null };
+
+        function dvrFotoViewerActiveList() {
+            return dvrFotoViewerMode === 'historico' ? dvrFotoViewerHistoricoList : dvrFotosViewerFlat;
+        }
 
         function openCameraViewer(index) {
             if (index < 0 || index >= camerasList.length) return;
@@ -348,11 +490,104 @@
         document.getElementById('cameraViewerModal')?.addEventListener('click', function(e) {
             if (e.target === this) closeCameraViewer();
         });
+
+        function openDvrFotoViewer(dvrId) {
+            dvrFotoViewerMode = 'cross';
+            dvrFotoViewerHistoricoList = [];
+            const hint = document.getElementById('dvrFotoViewerContextHint');
+            if (hint) hint.classList.add('hidden');
+            const idx = dvrFotosViewerFlat.findIndex(function (e) { return e.dvrId === dvrId || e.dvrId === Number(dvrId); });
+            if (idx < 0 || !dvrFotosViewerFlat.length) return;
+            dvrFotoViewerIndex = idx;
+            updateDvrFotoViewerContent();
+            document.getElementById('dvrFotoViewerModal').classList.remove('hidden');
+            document.body.classList.add('modal-open');
+        }
+
+        function openDvrFotoHistoricoViewer(historicalArr, startIndex, dvrNomeFallback) {
+            const arr = Array.isArray(historicalArr) ? historicalArr : [];
+            if (!arr.length) return;
+            dvrFotoViewerHistoricoList = arr.map(function (it) {
+                return {
+                    dvrNome: it.dvrNome || dvrNomeFallback || '',
+                    data: it.data || '—',
+                    fotoUrl: it.fotoUrl || it.url || '',
+                    id: it.id,
+                };
+            });
+            dvrFotoViewerMode = 'historico';
+            dvrFotoViewerIndex = Math.max(0, Math.min(startIndex || 0, dvrFotoViewerHistoricoList.length - 1));
+            const hint = document.getElementById('dvrFotoViewerContextHint');
+            if (hint) hint.classList.remove('hidden');
+            updateDvrFotoViewerContent();
+            document.getElementById('dvrFotoViewerModal').classList.remove('hidden');
+            document.body.classList.add('modal-open');
+        }
+
+        function closeDvrFotoViewer() {
+            dvrFotoViewerMode = 'cross';
+            dvrFotoViewerHistoricoList = [];
+            const hint = document.getElementById('dvrFotoViewerContextHint');
+            if (hint) hint.classList.add('hidden');
+            document.getElementById('dvrFotoViewerModal').classList.add('hidden');
+            document.body.classList.remove('modal-open');
+        }
+
+        function updateDvrFotoViewerContent() {
+            const list = dvrFotoViewerActiveList();
+            const item = list[dvrFotoViewerIndex];
+            if (!item) return;
+            document.getElementById('dvrFotoViewerDvrName').textContent = item.dvrNome || '';
+            document.getElementById('dvrFotoViewerDataLabel').textContent = item.data || '—';
+            const imgEl = document.getElementById('dvrFotoViewerImage');
+            imgEl.src = item.fotoUrl || item.url || '';
+            imgEl.alt = 'Foto do DVR';
+            document.getElementById('dvrFotoViewerCounter').textContent = (dvrFotoViewerIndex + 1) + ' / ' + list.length;
+            const prevBtn = document.getElementById('dvrFotoViewerBtnPrev');
+            const nextBtn = document.getElementById('dvrFotoViewerBtnNext');
+            if (dvrFotoViewerMode === 'historico') {
+                if (prevBtn) { prevBtn.title = 'Foto anterior'; }
+                if (nextBtn) { nextBtn.title = 'Próxima foto'; }
+            } else {
+                if (prevBtn) { prevBtn.title = 'DVR anterior'; }
+                if (nextBtn) { nextBtn.title = 'Próximo DVR'; }
+            }
+        }
+
+        function dvrFotoViewerNext() {
+            const list = dvrFotoViewerActiveList();
+            const n = list.length;
+            if (n <= 1) return;
+            dvrFotoViewerIndex = (dvrFotoViewerIndex + 1) % n;
+            updateDvrFotoViewerContent();
+        }
+
+        function dvrFotoViewerPrev() {
+            const list = dvrFotoViewerActiveList();
+            const n = list.length;
+            if (n <= 1) return;
+            dvrFotoViewerIndex = dvrFotoViewerIndex <= 0 ? n - 1 : dvrFotoViewerIndex - 1;
+            updateDvrFotoViewerContent();
+        }
+
+        document.getElementById('dvrFotoViewerModal')?.addEventListener('click', function(e) {
+            if (e.target === this) closeDvrFotoViewer();
+        });
+
         document.addEventListener('keydown', function(e) {
-            if (document.getElementById('cameraViewerModal').classList.contains('hidden')) return;
-            if (e.key === 'Escape') closeCameraViewer();
-            if (e.key === 'ArrowRight') cameraViewerNext();
-            if (e.key === 'ArrowLeft') cameraViewerPrev();
+            const camM = document.getElementById('cameraViewerModal');
+            const dvrVM = document.getElementById('dvrFotoViewerModal');
+            if (!camM.classList.contains('hidden')) {
+                if (e.key === 'Escape') closeCameraViewer();
+                if (e.key === 'ArrowRight') cameraViewerNext();
+                if (e.key === 'ArrowLeft') cameraViewerPrev();
+                return;
+            }
+            if (!dvrVM.classList.contains('hidden')) {
+                if (e.key === 'Escape') { closeDvrFotoViewer(); return; }
+                if (e.key === 'ArrowRight') { dvrFotoViewerNext(); return; }
+                if (e.key === 'ArrowLeft') { dvrFotoViewerPrev(); return; }
+            }
         });
 
         function openHistoricoCameraModal(nome, historical) {
@@ -400,9 +635,246 @@
             if (ev.target === this) closeHistoricoCameraModal();
         });
         document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape' && !document.getElementById('historicoCameraModal').classList.contains('hidden')) {
-                closeHistoricoCameraModal();
+            if (e.key !== 'Escape') return;
+            if (!document.getElementById('excluirDvrFotoModal').classList.contains('hidden')) {
+                closeExcluirDvrFotoModal();
+                return;
             }
+            if (!document.getElementById('dvrFotoViewerModal').classList.contains('hidden')) {
+                closeDvrFotoViewer();
+                return;
+            }
+            if (!document.getElementById('historicoCameraModal').classList.contains('hidden')) {
+                closeHistoricoCameraModal();
+                return;
+            }
+            if (!document.getElementById('historicoDvrModal').classList.contains('hidden')) {
+                closeHistoricoDvrModal();
+                return;
+            }
+            if (!document.getElementById('dvrFotoModal').classList.contains('hidden')) {
+                closeDvrFotoModal();
+            }
+        });
+
+        let currentDvrFotoId = null;
+
+        function openDvrFotoModal(id, nome) {
+            currentDvrFotoId = id;
+            document.getElementById('dvrFotoModalDvrNome').textContent = nome || '';
+            document.getElementById('dvrFotoForm').reset();
+            document.getElementById('dvrFotoFormError').classList.add('hidden');
+            document.getElementById('dvrFotoFormError').textContent = '';
+            document.getElementById('dvrFotoModal').classList.remove('hidden');
+            document.body.classList.add('modal-open');
+        }
+
+        function closeDvrFotoModal() {
+            currentDvrFotoId = null;
+            document.getElementById('dvrFotoModal').classList.add('hidden');
+            document.body.classList.remove('modal-open');
+        }
+
+        document.addEventListener('click', function(e) {
+            const btn = e.target.closest('.btn-dvr-foto');
+            if (!btn) return;
+            const id = parseInt(btn.getAttribute('data-dvr-id'), 10);
+            const nome = btn.getAttribute('data-dvr-nome') || '';
+            openDvrFotoModal(id, nome);
+        });
+
+        document.getElementById('dvrFotoForm')?.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const errEl = document.getElementById('dvrFotoFormError');
+            errEl.classList.add('hidden');
+            errEl.textContent = '';
+            if (!currentDvrFotoId) return;
+            const submitBtn = document.getElementById('dvrFotoSubmitBtn');
+            submitBtn.disabled = true;
+            const fd = new FormData(this);
+            try {
+                const r = await fetch(baseUrl + '/dvrs/' + currentDvrFotoId + '/fotos', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': csrfToken,
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json',
+                    },
+                    body: fd,
+                });
+                const data = await r.json().catch(() => ({}));
+                if (r.ok && data.success !== false) {
+                    showToast(data.message || 'Foto do DVR anexada com sucesso.');
+                    closeDvrFotoModal();
+                    location.reload();
+                    return;
+                }
+                let msg = data.message || 'Não foi possível enviar a foto.';
+                if (data.errors) {
+                    msg = Object.values(data.errors).flat().join(' ') || msg;
+                }
+                errEl.textContent = msg;
+                errEl.classList.remove('hidden');
+            } catch (_) {
+                errEl.textContent = 'Erro de rede. Tente novamente.';
+                errEl.classList.remove('hidden');
+            } finally {
+                submitBtn.disabled = false;
+            }
+        });
+
+        document.getElementById('dvrFotoModal')?.addEventListener('click', function(ev) {
+            if (ev.target === this) closeDvrFotoModal();
+        });
+
+        function openHistoricoDvrModal(nome, historical, dvrId) {
+            const arr = Array.isArray(historical) ? historical : (typeof historical === 'string' ? JSON.parse(historical || '[]') : []);
+            historicoDvrContext = { dvrId: dvrId != null && dvrId !== '' ? parseInt(dvrId, 10) : null, nome: nome || '', historical: arr };
+            document.getElementById('historicoDvrModalTitulo').textContent = 'Fotos do DVR – ' + (nome || '');
+            const lista = document.getElementById('historicoDvrModalLista');
+            lista.innerHTML = '';
+            if (arr.length === 0) {
+                lista.innerHTML = '<li class="text-gray-500 text-sm">Nenhuma foto anexada ainda. Use o ícone de câmera nas ações do DVR.</li>';
+            } else {
+                arr.forEach(function(item, index) {
+                    const li = document.createElement('li');
+                    li.className = 'flex gap-4 items-start border border-gray-200 rounded-lg p-3 bg-gray-50';
+                    let url = item.url || '';
+                    try {
+                        const u = new URL(url, window.location.origin);
+                        if (u.protocol !== 'http:' && u.protocol !== 'https:' && u.protocol !== window.location.protocol) url = '';
+                    } catch (_) { url = ''; }
+                    const btnThumb = document.createElement('button');
+                    btnThumb.type = 'button';
+                    btnThumb.className = 'flex-shrink-0 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded cursor-pointer hover:opacity-90';
+                    btnThumb.title = 'Ampliar e navegar pelo histórico deste DVR';
+                    const img = document.createElement('img');
+                    img.src = url || '';
+                    img.alt = '';
+                    img.className = 'h-20 w-auto max-w-[120px] object-cover rounded border border-gray-300 pointer-events-none';
+                    btnThumb.appendChild(img);
+                    btnThumb.addEventListener('click', function() {
+                        openDvrFotoHistoricoViewer(arr, index, nome);
+                    });
+                    const wrap = document.createElement('div');
+                    wrap.className = 'text-sm min-w-0 flex-1';
+                    const span = document.createElement('span');
+                    span.className = 'text-gray-600 font-medium';
+                    span.textContent = '[' + (item.data || '-') + ']';
+                    const p = document.createElement('p');
+                    p.className = 'text-gray-800 mt-1 break-words';
+                    p.textContent = item.arquivo || 'foto';
+                    const linkOpen = document.createElement('a');
+                    linkOpen.href = url || '#';
+                    linkOpen.target = '_blank';
+                    linkOpen.rel = 'noopener noreferrer';
+                    linkOpen.className = 'text-indigo-600 hover:underline text-xs mt-1 inline-block';
+                    linkOpen.textContent = 'Abrir em nova aba';
+                    wrap.appendChild(span);
+                    wrap.appendChild(p);
+                    wrap.appendChild(linkOpen);
+                    const actions = document.createElement('div');
+                    actions.className = 'flex flex-col gap-1 flex-shrink-0';
+                    const btnDel = document.createElement('button');
+                    btnDel.type = 'button';
+                    btnDel.className = 'p-2 text-red-600 hover:bg-red-50 rounded';
+                    btnDel.title = 'Remover do histórico';
+                    btnDel.innerHTML = '<i class="fas fa-trash-alt"></i>';
+                    btnDel.addEventListener('click', function() {
+                        if (historicoDvrContext.dvrId && item.id) {
+                            openExcluirDvrFotoModal(historicoDvrContext.dvrId, item.id);
+                        }
+                    });
+                    actions.appendChild(btnDel);
+                    li.appendChild(btnThumb);
+                    li.appendChild(wrap);
+                    li.appendChild(actions);
+                    lista.appendChild(li);
+                });
+            }
+            document.getElementById('historicoDvrModal').classList.remove('hidden');
+            document.body.classList.add('modal-open');
+        }
+
+        function closeHistoricoDvrModal() {
+            document.getElementById('historicoDvrModal').classList.add('hidden');
+            document.body.classList.remove('modal-open');
+        }
+
+        function openExcluirDvrFotoModal(dvrId, fotoId) {
+            excluirDvrFotoContext = { dvrId: dvrId, fotoId: fotoId };
+            document.getElementById('excluirDvrFotoSenha').value = '';
+            document.getElementById('excluirDvrFotoErro').classList.add('hidden');
+            document.getElementById('excluirDvrFotoModal').classList.remove('hidden');
+        }
+
+        function closeExcluirDvrFotoModal() {
+            excluirDvrFotoContext = { dvrId: null, fotoId: null };
+            document.getElementById('excluirDvrFotoModal').classList.add('hidden');
+        }
+
+        function confirmarExcluirDvrFoto() {
+            const { dvrId, fotoId } = excluirDvrFotoContext;
+            const erroEl = document.getElementById('excluirDvrFotoErro');
+            const senha = document.getElementById('excluirDvrFotoSenha').value;
+            if (!dvrId || !fotoId) {
+                erroEl.textContent = 'Dados inválidos.';
+                erroEl.classList.remove('hidden');
+                return;
+            }
+            if (!senha) {
+                erroEl.textContent = 'Digite a senha.';
+                erroEl.classList.remove('hidden');
+                return;
+            }
+            erroEl.classList.add('hidden');
+            const fd = new FormData();
+            fd.append('_token', csrfToken || '');
+            fd.append('_method', 'DELETE');
+            fd.append('senha', senha);
+            fetch(baseUrl + '/dvrs/' + dvrId + '/fotos/' + fotoId, {
+                method: 'POST',
+                body: fd,
+                headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+            })
+            .then(function(r) {
+                return r.json().then(function(data) { return { ok: r.ok, data: data }; }).catch(function() { return { ok: false, data: {} }; });
+            })
+            .then(function(res) {
+                if (res.ok && res.data.success !== false) {
+                    closeExcluirDvrFotoModal();
+                    showToast(res.data.message || 'Foto removida.');
+                    window.location.reload();
+                } else {
+                    erroEl.textContent = (res.data && res.data.message) ? res.data.message : 'Não foi possível remover.';
+                    erroEl.classList.remove('hidden');
+                }
+            })
+            .catch(function() {
+                erroEl.textContent = 'Erro de rede.';
+                erroEl.classList.remove('hidden');
+            });
+        }
+
+        document.getElementById('excluirDvrFotoModal')?.addEventListener('click', function(ev) {
+            if (ev.target === this) closeExcluirDvrFotoModal();
+        });
+
+        document.addEventListener('click', function(e) {
+            const btn = e.target.closest('.btn-historico-dvr');
+            if (!btn) return;
+            const nome = btn.getAttribute('data-dvr-nome') || 'DVR';
+            const dvrId = btn.getAttribute('data-dvr-id');
+            const raw = btn.getAttribute('data-historical');
+            let historical = [];
+            try {
+                if (raw) historical = JSON.parse(atob(raw) || '[]');
+            } catch (_) {}
+            openHistoricoDvrModal(nome, historical, dvrId);
+        });
+
+        document.getElementById('historicoDvrModal')?.addEventListener('click', function(ev) {
+            if (ev.target === this) closeHistoricoDvrModal();
         });
 
         function showToast(message, type = 'success') {

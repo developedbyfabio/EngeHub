@@ -6,7 +6,7 @@
         <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
             <div class="p-6 text-gray-900">
                     
-                    @if($tabs->count() > 0)
+                    @if($tabs->count() > 0 || $favoritesTab)
                         <!-- Sistema de Abas com Filtros -->
                         <div class="mb-8" x-data="{ 
                             activeTab: '{{ $favoritesTab ? 'favorites' : ($tabs->first() ? $tabs->first()->id : '') }}',

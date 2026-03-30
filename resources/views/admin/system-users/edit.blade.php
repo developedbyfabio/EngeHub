@@ -37,6 +37,53 @@
             @enderror
         </div>
 
+        <div>
+            <label for="user_group_id" class="block text-sm font-medium text-gray-700">Grupo de acesso *</label>
+            <select name="user_group_id" id="user_group_id" required
+                    class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                @foreach($groups as $g)
+                    <option value="{{ $g->id }}" @selected(old('user_group_id', $user->user_group_id) == $g->id)>
+                        {{ $g->name }}@if($g->full_access) (acesso total ao menu)@endif
+                    </option>
+                @endforeach
+            </select>
+            @error('user_group_id')
+                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+            @enderror
+       </div>
+
+        @php
+            $allServiceKeys = \App\Support\UserService::allKeys();
+            $enabledStored = $user->enabled_services;
+            $effectiveEnabled = ($enabledStored === null || $user->userGroup?->full_access || $user->hasFullAccess())
+                ? $allServiceKeys
+                : $enabledStored;
+            $enabledForForm = old('enabled_services', $effectiveEnabled);
+            if (! is_array($enabledForForm)) {
+                $enabledForForm = [];
+            }
+        @endphp
+        <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Serviços que o usuário pode executar</label>
+            <p class="text-xs text-gray-500 mb-3">Checklists e demais fluxos. Grupos com <strong>acesso total ao menu</strong> ou permissão administrativa plena ignoram esta lista (sempre todos os serviços).</p>
+            <div class="space-y-2">
+                @foreach(\App\Support\UserService::labels() as $serviceKey => $serviceLabel)
+                    <label class="flex items-start gap-2 cursor-pointer">
+                        <input type="checkbox" name="enabled_services[]" value="{{ $serviceKey }}"
+                               class="mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                               @checked(in_array($serviceKey, $enabledForForm, true))>
+                        <span class="text-sm text-gray-800">{{ $serviceLabel }}</span>
+                    </label>
+                @endforeach
+            </div>
+            @error('enabled_services')
+                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+            @enderror
+            @error('enabled_services.*')
+                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+            @enderror
+        </div>
+
         <!-- Instruções de Login -->
         <div class="bg-blue-50 border border-blue-200 rounded-md p-4">
             <div class="flex">

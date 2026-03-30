@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Admin\NetworkMapController;
 use App\Models\Device;
 use App\Models\NetworkMap;
+use App\Support\NavPermission;
 use Illuminate\Http\Request;
 
 class FiliaisController extends Controller
@@ -33,7 +34,7 @@ class FiliaisController extends Controller
 
         $filiaisMode = true;
         $canEditDevices = auth()->guard('web')->check()
-            && auth()->guard('web')->user()->hasFullAccess();
+            && auth()->guard('web')->user()->canAccessNav(NavPermission::ADMIN_NETWORK_MAPS);
 
         return view('admin.network-maps.show', compact(
             'network_map',

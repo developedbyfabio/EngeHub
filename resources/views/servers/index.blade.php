@@ -11,7 +11,7 @@
                     Tela cheia
                 </button>
             @endif
-            @if(auth()->user()?->hasFullAccess() ?? false)
+            @if(auth()->user()?->canAccessNav(\App\Support\NavPermission::ADMIN_SERVERS) ?? false)
                 <a href="{{ route('admin.servers.index') }}" class="page-header-btn-secondary">
                     <i class="fas fa-cog mr-2"></i>
                     Gerenciar Servidores
@@ -67,7 +67,7 @@
                             </div>
                             <h3 class="text-lg font-medium text-gray-900 mb-2">Nenhum servidor cadastrado</h3>
                             <p class="text-gray-500 mb-4">Não há servidores cadastrados no sistema ainda.</p>
-                            @if(auth()->user()?->hasFullAccess() ?? false)
+                            @if(auth()->user()?->canAccessNav(\App\Support\NavPermission::ADMIN_SERVERS) ?? false)
                                 <a href="{{ route('admin.servers.index') }}"
                                    class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
                                     <i class="fas fa-plus mr-2"></i>

@@ -222,7 +222,13 @@
     function mapApplyTransform() {
         var w = document.getElementById('svgWrapper');
         if (!w) return;
-        w.style.transform = 'translate(' + mapTranslateX + 'px, ' + mapTranslateY + 'px) scale(' + mapZoomLevel + ')';
+        var s = mapZoomLevel;
+        if (Math.abs(s - 1) < 0.0001) {
+            s = 1;
+        }
+        var tx = Math.round(mapTranslateX);
+        var ty = Math.round(mapTranslateY);
+        w.style.transform = 'translate3d(' + tx + 'px,' + ty + 'px,0) scale(' + s + ')';
     }
     function mapScheduleTransform() {
         if (mapRAF !== null) return;
@@ -355,15 +361,41 @@
             if (f < n) {
                 requestAnimationFrame(tick);
             } else {
-                mapTranslateX = endTx;
-                mapTranslateY = endTy;
-                mapZoomLevel = endS;
+                mapTranslateX = Math.round(endTx);
+                mapTranslateY = Math.round(endTy);
+                mapZoomLevel = Math.abs(endS - 1) < 0.0001 ? 1 : endS;
                 mapApplyTransform();
                 updateZoomLevelDisplay();
             }
         }
         requestAnimationFrame(tick);
     }
+
+    /**
+     * Centraliza o mapa em um elemento .device via pan/zoom (transform), sem scroll da página nem do #mapaContainer.
+     * options: { zoom?: number (default = busca colaborador), animated?: boolean (default true) }
+     */
+    window.engeHubNetworkMapFocusOnElement = function(el, options) {
+        options = options || {};
+        var targetZoom = options.zoom != null ? Number(options.zoom) : SEAT_SEARCH_TARGET_ZOOM;
+        if (!el || !isFinite(targetZoom) || targetZoom <= 0) {
+            return false;
+        }
+        var end = computeTransformCenterElement(el, targetZoom);
+        if (!end) {
+            return false;
+        }
+        if (options.animated === false) {
+            mapTranslateX = Math.round(end.tx);
+            mapTranslateY = Math.round(end.ty);
+            mapZoomLevel = Math.abs(end.s - 1) < 0.0001 ? 1 : end.s;
+            mapApplyTransform();
+            updateZoomLevelDisplay();
+        } else {
+            animateMapToTransform(end.tx, end.ty, end.s);
+        }
+        return true;
+    };
 
     function updateSeatSearchStatusUI() {
         var nav = document.getElementById('mapSearchNav');

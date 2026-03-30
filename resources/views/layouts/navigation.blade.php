@@ -13,23 +13,35 @@
                 <!-- Navigation Links -->
                 <div class="hidden space-x-8 sm:-my-px sm:ml-10 sm:flex">
                     @if(auth()->check() || auth()->guard('system')->check() || !request()->routeIs('home'))
+                        @php
+                            $webNavUser = auth()->guard('web')->user();
+                            $showMainNavGuest = !auth()->check() && !auth()->guard('system')->check();
+                        @endphp
+                        @if($showMainNavGuest || auth()->guard('system')->check() || ($webNavUser && $webNavUser->canAccessNav(\App\Support\NavPermission::HOME)))
                         <x-nav-link :href="route('home')" :active="request()->routeIs('home')">
                             {{ __('Início') }}
                         </x-nav-link>
+                        @endif
+                        @if($showMainNavGuest || auth()->guard('system')->check() || ($webNavUser && $webNavUser->canAccessNav(\App\Support\NavPermission::SERVERS)))
                         <x-nav-link :href="route('servers.index')" :active="request()->routeIs('servers.*')">
                             {{ __('Servidores') }}
                         </x-nav-link>
+                        @endif
+                        @if($showMainNavGuest || auth()->guard('system')->check() || ($webNavUser && $webNavUser->canAccessNav(\App\Support\NavPermission::CAMERAS)))
                         <x-nav-link :href="route('cameras.index')" :active="request()->routeIs('cameras.*')">
                             {{ __('Câmeras') }}
                         </x-nav-link>
+                        @endif
+                        @if($showMainNavGuest || auth()->guard('system')->check() || ($webNavUser && $webNavUser->canAccessNav(\App\Support\NavPermission::FILIAIS)))
                         <x-nav-link :href="route('filiais.index')" :active="request()->routeIs('filiais.*')">
                             {{ __('Filiais') }}
                         </x-nav-link>
+                        @endif
                     @endif
                     
-                    @if(auth()->check() && auth()->user()->hasFullAccess())
+                    @if(auth()->check() && auth()->user()->canSeeGerenciarMenu())
                         @php
-                            $gerenciarActive = request()->routeIs('admin.cards.*') || request()->routeIs('admin.system-users.*') || request()->routeIs('admin.sectors.*') || request()->routeIs('admin.network-maps.*') || request()->routeIs('admin.servers.*') || request()->routeIs('admin.cameras.*') || request()->routeIs('admin.forms.*') || request()->routeIs('admin.branches.*') || request()->routeIs('admin.extension-list.*');
+                            $gerenciarActive = request()->routeIs('admin.cards.*') || request()->routeIs('admin.system-users.*') || request()->routeIs('admin.user-groups.*') || request()->routeIs('admin.sectors.*') || request()->routeIs('admin.network-maps.*') || request()->routeIs('admin.servers.*') || request()->routeIs('admin.server-groups.*') || request()->routeIs('admin.cameras.*') || request()->routeIs('admin.forms.*') || request()->routeIs('admin.branches.*') || request()->routeIs('admin.extension-list.*');
                         @endphp
                         <div class="relative inline-flex" x-data="{ open: false }" @mouseenter="open = true" @mouseleave="open = false" @click.outside="open = false">
                             <button type="button" @click="open = ! open" :class="{ 'gerenciar-dropdown-open': open }" class="inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium leading-5 transition duration-150 ease-in-out cursor-pointer gerenciar-dropdown-trigger {{ $gerenciarActive ? 'border-primary-400 text-primary-400' : 'border-transparent text-gray-500' }}">
@@ -48,14 +60,30 @@
                                     class="absolute left-0 top-full z-50 mt-0.5 w-56 origin-top-left rounded-md bg-gray-800 shadow-lg ring-1 ring-black ring-opacity-5"
                                     style="display: none;">
                                 <div class="py-1">
+                                    @if(auth()->user()->canAccessNav(\App\Support\NavPermission::ADMIN_CAMERAS))
                                     <a href="{{ route('admin.cameras.index') }}" class="block px-4 py-2 text-sm text-gray-200 hover:bg-gray-700 hover:text-white transition duration-150 ease-in-out">Gerenciar Câmeras</a>
+                                    @endif
+                                    @if(auth()->user()->canAccessNav(\App\Support\NavPermission::ADMIN_CARDS))
                                     <a href="{{ route('admin.cards.index') }}" class="block px-4 py-2 text-sm text-gray-200 hover:bg-gray-700 hover:text-white transition duration-150 ease-in-out">Gerenciar Cards</a>
+                                    @endif
+                                    @if(auth()->user()->canAccessNav(\App\Support\NavPermission::ADMIN_FORMS))
                                     <a href="{{ route('admin.forms.index') }}" class="block px-4 py-2 text-sm text-gray-200 hover:bg-gray-700 hover:text-white transition duration-150 ease-in-out">Gerenciar Formulários e Checklists</a>
+                                    @endif
+                                    @if(auth()->user()->canAccessNav(\App\Support\NavPermission::ADMIN_EXTENSION_LIST))
                                     <a href="{{ route('admin.extension-list.index') }}" class="block px-4 py-2 text-sm text-gray-200 hover:bg-gray-700 hover:text-white transition duration-150 ease-in-out">Gerenciar Lista de Ramais</a>
+                                    @endif
+                                    @if(auth()->user()->canAccessNav(\App\Support\NavPermission::ADMIN_NETWORK_MAPS))
                                     <a href="{{ route('admin.network-maps.index') }}" class="block px-4 py-2 text-sm text-gray-200 hover:bg-gray-700 hover:text-white transition duration-150 ease-in-out">Gerenciar Mapas de Rede</a>
+                                    @endif
+                                    @if(auth()->user()->canAccessNav(\App\Support\NavPermission::ADMIN_SERVERS))
                                     <a href="{{ route('admin.servers.index') }}" class="block px-4 py-2 text-sm text-gray-200 hover:bg-gray-700 hover:text-white transition duration-150 ease-in-out">Gerenciar Servidores</a>
+                                    @endif
+                                    @if(auth()->user()->canAccessNav(\App\Support\NavPermission::ADMIN_SECTORS))
                                     <a href="{{ route('admin.sectors.index') }}" class="block px-4 py-2 text-sm text-gray-200 hover:bg-gray-700 hover:text-white transition duration-150 ease-in-out">Gerenciar Setores</a>
-                                    <a href="{{ route('admin.system-users.index') }}" class="block px-4 py-2 text-sm text-gray-200 hover:bg-gray-700 hover:text-white transition duration-150 ease-in-out">Gerenciar Usuários</a>
+                                    @endif
+                                    @if(auth()->user()->canAccessNav(\App\Support\NavPermission::ADMIN_SYSTEM_USERS))
+                                    <a href="{{ route('admin.system-users.index') }}" class="block px-4 py-2 text-sm text-gray-200 hover:bg-gray-700 hover:text-white transition duration-150 ease-in-out">Gerenciar Grupos e Usuários</a>
+                                    @endif
                                 </div>
                             </div>
                         </div>
@@ -121,21 +149,33 @@
     <div :class="{'block': open, 'hidden': ! open}" class="hidden sm:hidden">
         <div class="pt-2 pb-3 space-y-1">
             @if(auth()->check() || auth()->guard('system')->check() || !request()->routeIs('home'))
+                @php
+                    $webNavUserM = auth()->guard('web')->user();
+                    $showMainNavGuestM = !auth()->check() && !auth()->guard('system')->check();
+                @endphp
+                @if($showMainNavGuestM || auth()->guard('system')->check() || ($webNavUserM && $webNavUserM->canAccessNav(\App\Support\NavPermission::HOME)))
                 <x-responsive-nav-link :href="route('home')" :active="request()->routeIs('home')">
                     {{ __('Início') }}
                 </x-responsive-nav-link>
+                @endif
+                @if($showMainNavGuestM || auth()->guard('system')->check() || ($webNavUserM && $webNavUserM->canAccessNav(\App\Support\NavPermission::SERVERS)))
                 <x-responsive-nav-link :href="route('servers.index')" :active="request()->routeIs('servers.*')">
                     {{ __('Servidores') }}
                 </x-responsive-nav-link>
+                @endif
+                @if($showMainNavGuestM || auth()->guard('system')->check() || ($webNavUserM && $webNavUserM->canAccessNav(\App\Support\NavPermission::CAMERAS)))
                 <x-responsive-nav-link :href="route('cameras.index')" :active="request()->routeIs('cameras.*')">
                     {{ __('Câmeras') }}
                 </x-responsive-nav-link>
+                @endif
+                @if($showMainNavGuestM || auth()->guard('system')->check() || ($webNavUserM && $webNavUserM->canAccessNav(\App\Support\NavPermission::FILIAIS)))
                 <x-responsive-nav-link :href="route('filiais.index')" :active="request()->routeIs('filiais.*')">
                     {{ __('Filiais') }}
                 </x-responsive-nav-link>
+                @endif
             @endif
             
-            @if(auth()->check() && auth()->user()->hasFullAccess())
+            @if(auth()->check() && auth()->user()->canSeeGerenciarMenu())
                 <div x-data="{ gerenciarOpen: false }" class="border-b border-gray-200">
                     <button @click="gerenciarOpen = ! gerenciarOpen" class="flex w-full items-center justify-between pl-3 pr-4 py-2 border-l-4 border-transparent text-left text-base font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-50 hover:border-gray-300 focus:outline-none">
                         {{ __('Gerenciar') }}
@@ -151,30 +191,46 @@
                             x-transition:leave-start="opacity-100"
                             x-transition:leave-end="opacity-0"
                             class="pl-4 pb-2 space-y-1">
+                        @if(auth()->user()->canAccessNav(\App\Support\NavPermission::ADMIN_CAMERAS))
                         <x-responsive-nav-link :href="route('admin.cameras.index')" :active="request()->routeIs('admin.cameras.*')">
                             {{ __('Gerenciar Câmeras') }}
                         </x-responsive-nav-link>
+                        @endif
+                        @if(auth()->user()->canAccessNav(\App\Support\NavPermission::ADMIN_CARDS))
                         <x-responsive-nav-link :href="route('admin.cards.index')" :active="request()->routeIs('admin.cards.*')">
                             {{ __('Gerenciar Cards') }}
                         </x-responsive-nav-link>
+                        @endif
+                        @if(auth()->user()->canAccessNav(\App\Support\NavPermission::ADMIN_FORMS))
                         <x-responsive-nav-link :href="route('admin.forms.index')" :active="request()->routeIs('admin.forms.*') || request()->routeIs('admin.branches.*')">
                             {{ __('Gerenciar Formulários e Checklists') }}
                         </x-responsive-nav-link>
+                        @endif
+                        @if(auth()->user()->canAccessNav(\App\Support\NavPermission::ADMIN_EXTENSION_LIST))
                         <x-responsive-nav-link :href="route('admin.extension-list.index')" :active="request()->routeIs('admin.extension-list.*')">
                             {{ __('Gerenciar Lista de Ramais') }}
                         </x-responsive-nav-link>
+                        @endif
+                        @if(auth()->user()->canAccessNav(\App\Support\NavPermission::ADMIN_NETWORK_MAPS))
                         <x-responsive-nav-link :href="route('admin.network-maps.index')" :active="request()->routeIs('admin.network-maps.*')">
                             {{ __('Gerenciar Mapas de Rede') }}
                         </x-responsive-nav-link>
+                        @endif
+                        @if(auth()->user()->canAccessNav(\App\Support\NavPermission::ADMIN_SERVERS))
                         <x-responsive-nav-link :href="route('admin.servers.index')" :active="request()->routeIs('admin.servers.*')">
                             {{ __('Gerenciar Servidores') }}
                         </x-responsive-nav-link>
+                        @endif
+                        @if(auth()->user()->canAccessNav(\App\Support\NavPermission::ADMIN_SECTORS))
                         <x-responsive-nav-link :href="route('admin.sectors.index')" :active="request()->routeIs('admin.sectors.*')">
                             {{ __('Gerenciar Setores') }}
                         </x-responsive-nav-link>
-                        <x-responsive-nav-link :href="route('admin.system-users.index')" :active="request()->routeIs('admin.system-users.*')">
-                            {{ __('Gerenciar Usuários') }}
+                        @endif
+                        @if(auth()->user()->canAccessNav(\App\Support\NavPermission::ADMIN_SYSTEM_USERS))
+                        <x-responsive-nav-link :href="route('admin.system-users.index')" :active="request()->routeIs('admin.system-users.*') || request()->routeIs('admin.user-groups.*')">
+                            {{ __('Gerenciar Grupos e Usuários') }}
                         </x-responsive-nav-link>
+                        @endif
                     </div>
                 </div>
             @endif

@@ -3,7 +3,11 @@
 @section('header')
     <x-page-header title="Gerenciar Cards" icon="fas fa-th-large">
         <x-slot name="actions">
-            <button onclick="openTabsManagerModal()" class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700 transition ease-in-out duration-150">
+            <button type="button" onclick="openCardGroupPermissionsModal()" class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-700 transition ease-in-out duration-150">
+                <i class="fas fa-user-shield mr-2"></i>
+                Gerenciar Permissões
+            </button>
+            <button type="button" onclick="openTabsManagerModal()" class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700 transition ease-in-out duration-150">
                 <i class="fas fa-folder-open mr-2"></i>
                 Gerenciar Abas
             </button>
@@ -325,6 +329,44 @@
         </div>
     </div>
 
+    <!-- Modal matriz cards × grupos (visibilidade no Início) -->
+    <div id="cardGroupPermissionsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50 flex items-center justify-center delete-confirm-modal p-4">
+        <div class="w-full max-w-[min(96vw,1400px)] max-h-[92vh] shadow-lg rounded-md bg-white modal-content delete-confirm-content flex flex-col">
+            <div class="flex-shrink-0 flex justify-between items-center gap-3 px-6 pt-4 pb-3 border-b border-gray-100">
+                <h3 class="text-lg font-medium text-gray-900 flex items-center gap-2">
+                    <i class="fas fa-user-shield text-indigo-600"></i>
+                    Gerenciar Permissões
+                </h3>
+                <button type="button" onclick="closeCardGroupPermissionsModal()" class="text-gray-400 hover:text-gray-600 p-1 shrink-0" aria-label="Fechar">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="px-6 py-3 flex flex-wrap items-center gap-3 border-b border-gray-100 bg-gray-50">
+                <button type="button" id="cardGroupPermissionsSaveBtn" onclick="saveCardGroupPermissionsMatrix()" class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <i class="fas fa-save mr-2"></i>
+                    Salvar alterações
+                </button>
+                <div class="flex items-center gap-2">
+                    <label for="cardGroupPermissionsTabFilter" class="text-xs font-medium text-gray-600 whitespace-nowrap">Filtrar por aba</label>
+                    <select id="cardGroupPermissionsTabFilter" class="text-sm border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 min-w-[180px]">
+                        <option value="">Todas as abas</option>
+                    </select>
+                </div>
+                <span id="cardGroupPermissionsStatus" class="text-sm text-gray-600 ml-auto"></span>
+            </div>
+            <div class="px-6 py-4 overflow-auto flex-1 min-h-0" id="cardGroupPermissionsScroll">
+                <div id="cardGroupPermissionsLoading" class="text-center py-12 hidden">
+                    <i class="fas fa-spinner fa-spin text-3xl text-indigo-500"></i>
+                    <p class="text-gray-500 mt-2">Carregando cards e grupos…</p>
+                </div>
+                <div id="cardGroupPermissionsError" class="hidden text-center py-8 text-red-600 text-sm"></div>
+                <div id="cardGroupPermissionsTableWrap" class="hidden overflow-x-auto rounded-lg border border-gray-200">
+                    <table class="min-w-full divide-y divide-gray-200 text-sm" id="cardGroupPermissionsTable"></table>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal Gerenciar Abas -->
     <div id="tabsManagerModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50 flex items-center justify-center delete-confirm-modal p-4">
         <div class="w-full max-w-4xl max-h-[90vh] shadow-lg rounded-md bg-white modal-content delete-confirm-content flex flex-col">
@@ -514,6 +556,17 @@
         /* Estilos para modais */
         .modal-open {
             overflow: hidden;
+        }
+
+        /* Matriz Gerenciar Permissões (cards × grupos) */
+        #cardGroupPermissionsTable tbody tr.cg-matrix-row {
+            transition: background-color 0.12s ease;
+        }
+        #cardGroupPermissionsTable tbody tr.cg-matrix-row:hover td {
+            background-color: rgb(238 242 255);
+        }
+        #cardGroupPermissionsTable tbody tr.cg-matrix-row:hover td.cg-matrix-sticky-cell {
+            background-color: rgb(224 231 255);
         }
         
         .modal-content {
@@ -1858,6 +1911,262 @@
                 });
             }
         });
+
+        /* ——— Matriz cards × grupos (visibilidade Início) ——— */
+        const cardGroupPermissionsDataUrl = @json(route('admin.cards.group-permissions-matrix.data'));
+        const cardGroupPermissionsSaveUrl = @json(route('admin.cards.group-permissions-matrix.sync'));
+        let __cgMatrixCardIds = [];
+
+        function openCardGroupPermissionsModal() {
+            document.getElementById('cardGroupPermissionsModal').classList.remove('hidden');
+            document.body.classList.add('modal-open');
+            loadCardGroupPermissionsMatrix();
+        }
+
+        function closeCardGroupPermissionsModal() {
+            document.getElementById('cardGroupPermissionsModal').classList.add('hidden');
+            document.body.classList.remove('modal-open');
+        }
+
+        function escapeHtmlMatrix(s) {
+            if (s === null || s === undefined) return '';
+            const d = document.createElement('div');
+            d.textContent = s;
+            return d.innerHTML;
+        }
+
+        function escapeAttrMatrix(s) {
+            if (s === null || s === undefined) return '';
+            return String(s)
+                .replace(/&/g, '&amp;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;')
+                .replace(/</g, '&lt;');
+        }
+
+        function safeTabColorForMatrix(hex) {
+            const s = String(hex == null ? '' : hex).trim();
+            return /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(s) ? s : '#6366f1';
+        }
+
+        function buildCardIconHtmlForMatrix(c) {
+            const color = safeTabColorForMatrix(c.tab_color);
+            if (c.custom_icon_url) {
+                const u = escapeHtmlMatrix(c.custom_icon_url);
+                return `<img src="${u}" alt="" class="w-8 h-8 object-contain rounded">`;
+            }
+            if (c.icon) {
+                return `<i class="${escapeHtmlMatrix(c.icon)} text-xl leading-none" style="color: ${color};"></i>`;
+            }
+            return `<div class="w-8 h-8 rounded-full flex-shrink-0 border border-gray-100" style="background-color: ${color};"></div>`;
+        }
+
+        function populateCardGroupPermissionsTabFilter(cards) {
+            const sel = document.getElementById('cardGroupPermissionsTabFilter');
+            if (!sel) return;
+            const tabs = [...new Set(cards.map(c => c.tab_name).filter(t => t && t !== '—'))]
+                .sort((a, b) => a.localeCompare(b, 'pt-BR'));
+            sel.innerHTML = '';
+            const optAll = document.createElement('option');
+            optAll.value = '';
+            optAll.textContent = 'Todas as abas';
+            sel.appendChild(optAll);
+            tabs.forEach(t => {
+                const o = document.createElement('option');
+                o.value = t;
+                o.textContent = t;
+                sel.appendChild(o);
+            });
+            sel.value = '';
+        }
+
+        function applyCardGroupPermissionsTabFilter(tabName) {
+            document.querySelectorAll('#cardGroupPermissionsTable tbody tr.cg-matrix-row').forEach(tr => {
+                const t = tr.getAttribute('data-tab-name') || '';
+                tr.style.display = (!tabName || t === tabName) ? '' : 'none';
+            });
+        }
+
+        function syncColumnHeaderState(table, groupId) {
+            if (!table || groupId === null || groupId === undefined) return;
+            const gid = String(groupId);
+            const header = table.querySelector('.cg-col-select-all[data-group-id="' + gid + '"]');
+            const cells = table.querySelectorAll('.cg-matrix-cb[data-group-id="' + gid + '"]');
+            if (!header || !cells.length) return;
+            let checked = 0;
+            cells.forEach(cb => { if (cb.checked) checked++; });
+            header.checked = checked === cells.length && cells.length > 0;
+            header.indeterminate = checked > 0 && checked < cells.length;
+        }
+
+        function syncAllColumnHeaderStates(table) {
+            if (!table) return;
+            table.querySelectorAll('.cg-col-select-all').forEach(h => {
+                syncColumnHeaderState(table, h.getAttribute('data-group-id'));
+            });
+        }
+
+        if (!window.__cgTabFilterBound) {
+            window.__cgTabFilterBound = true;
+            document.getElementById('cardGroupPermissionsTabFilter')?.addEventListener('change', function() {
+                applyCardGroupPermissionsTabFilter(this.value);
+            });
+        }
+
+        if (!window.__cgPermissionsMatrixChangeBound) {
+            window.__cgPermissionsMatrixChangeBound = true;
+            document.body.addEventListener('change', function(e) {
+                const t = e.target;
+                const table = document.getElementById('cardGroupPermissionsTable');
+                if (!table || !table.contains(t)) return;
+                if (t.classList.contains('cg-col-select-all')) {
+                    const gid = t.getAttribute('data-group-id');
+                    const on = t.checked;
+                    table.querySelectorAll('.cg-matrix-cb[data-group-id="' + gid + '"]').forEach(cb => { cb.checked = on; });
+                    t.indeterminate = false;
+                    syncColumnHeaderState(table, gid);
+                    return;
+                }
+                if (t.classList.contains('cg-matrix-cb')) {
+                    syncColumnHeaderState(table, t.getAttribute('data-group-id'));
+                }
+            });
+        }
+
+        async function loadCardGroupPermissionsMatrix() {
+            const loading = document.getElementById('cardGroupPermissionsLoading');
+            const errEl = document.getElementById('cardGroupPermissionsError');
+            const wrap = document.getElementById('cardGroupPermissionsTableWrap');
+            const status = document.getElementById('cardGroupPermissionsStatus');
+            errEl.classList.add('hidden');
+            errEl.textContent = '';
+            status.textContent = '';
+            loading.classList.remove('hidden');
+            wrap.classList.add('hidden');
+            try {
+                const r = await fetch(cardGroupPermissionsDataUrl, {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                });
+                const data = await r.json();
+                if (!r.ok) {
+                    throw new Error(data.message || 'Erro ao carregar dados.');
+                }
+                renderCardGroupPermissionsTable(data);
+                loading.classList.add('hidden');
+                wrap.classList.remove('hidden');
+            } catch (e) {
+                loading.classList.add('hidden');
+                errEl.textContent = e.message || 'Falha ao carregar.';
+                errEl.classList.remove('hidden');
+            }
+        }
+
+        function renderCardGroupPermissionsTable(data) {
+            const table = document.getElementById('cardGroupPermissionsTable');
+            const groups = data.groups || [];
+            const cards = data.cards || [];
+            __cgMatrixCardIds = cards.map(c => c.id);
+
+            if (cards.length === 0) {
+                table.innerHTML = '<tbody><tr><td class="px-4 py-8 text-center text-gray-500">Nenhum card cadastrado.</td></tr></tbody>';
+                populateCardGroupPermissionsTabFilter([]);
+                return;
+            }
+
+            if (groups.length === 0) {
+                table.innerHTML = '<tbody><tr><td class="px-4 py-8 text-center text-gray-500">Nenhum grupo de usuários cadastrado. Crie grupos em Gerenciar Grupos e Usuários.</td></tr></tbody>';
+                populateCardGroupPermissionsTabFilter(cards);
+                return;
+            }
+
+            let html = '<thead class="bg-gray-50"><tr>';
+            html += '<th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap sticky left-0 bg-gray-50 z-20 min-w-[260px] border-r border-gray-200 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)] align-bottom">Card / Aba</th>';
+            groups.forEach(g => {
+                html += `<th class="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase whitespace-nowrap min-w-[5.5rem] align-bottom">
+                    <div class="flex flex-col items-center gap-1.5">
+                        <input type="checkbox" class="cg-col-select-all rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer" data-group-id="${g.id}" title="Marcar ou desmarcar todos os cards para ${escapeAttrMatrix(g.name)}">
+                        <span class="inline-block max-w-[120px] truncate leading-tight" title="${escapeHtmlMatrix(g.name)}">${escapeHtmlMatrix(g.name)}</span>
+                    </div>
+                </th>`;
+            });
+            html += '</tr></thead><tbody class="bg-white divide-y divide-gray-100">';
+
+            cards.forEach(c => {
+                const tabName = c.tab_name || '';
+                html += `<tr class="cg-matrix-row" data-tab-name="${escapeAttrMatrix(tabName)}">`;
+                html += `<td class="px-3 py-2 sticky left-0 z-10 border-r border-gray-100 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)] cg-matrix-sticky-cell bg-white">
+                    <div class="flex items-center gap-3 min-w-0">
+                        <div class="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-lg border border-gray-200 bg-gray-50/80">
+                            ${buildCardIconHtmlForMatrix(c)}
+                        </div>
+                        <div class="min-w-0">
+                            <div class="font-medium text-gray-900 truncate">${escapeHtmlMatrix(c.name)}</div>
+                            <div class="text-xs text-gray-500 truncate">${escapeHtmlMatrix(tabName)}</div>
+                        </div>
+                    </div></td>`;
+                const set = new Set((c.group_ids || []).map(Number));
+                groups.forEach(g => {
+                    const checked = set.has(g.id) ? ' checked' : '';
+                    html += `<td class="px-2 py-2 text-center align-middle bg-white">
+                        <input type="checkbox" class="cg-matrix-cb rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer" data-card-id="${c.id}" data-group-id="${g.id}"${checked}>
+                    </td>`;
+                });
+                html += '</tr>';
+            });
+            html += '</tbody>';
+            table.innerHTML = html;
+
+            populateCardGroupPermissionsTabFilter(cards);
+            applyCardGroupPermissionsTabFilter('');
+            syncAllColumnHeaderStates(table);
+        }
+
+        async function saveCardGroupPermissionsMatrix() {
+            const btn = document.getElementById('cardGroupPermissionsSaveBtn');
+            const status = document.getElementById('cardGroupPermissionsStatus');
+            const matrix = {};
+            __cgMatrixCardIds.forEach(id => {
+                matrix[String(id)] = [];
+            });
+            document.querySelectorAll('#cardGroupPermissionsTable .cg-matrix-cb:checked').forEach(cb => {
+                const cid = String(cb.getAttribute('data-card-id'));
+                const gid = parseInt(cb.getAttribute('data-group-id'), 10);
+                if (!matrix[cid]) matrix[cid] = [];
+                matrix[cid].push(gid);
+            });
+
+            btn.disabled = true;
+            status.textContent = 'Salvando…';
+            try {
+                const r = await fetch(cardGroupPermissionsSaveUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    body: JSON.stringify({ matrix }),
+                });
+                const data = await r.json();
+                if (!r.ok) {
+                    throw new Error(data.message || (data.errors ? JSON.stringify(data.errors) : 'Erro ao salvar.'));
+                }
+                status.textContent = data.message || 'Salvo.';
+                if (typeof window.showToast === 'function') {
+                    window.showToast(data.message || 'Visibilidade atualizada.', 'success', 4500);
+                }
+            } catch (e) {
+                status.textContent = '';
+                if (typeof window.showToast === 'function') {
+                    window.showToast(e.message || 'Erro ao salvar.', 'error', 5500);
+                } else {
+                    alert(e.message || 'Erro ao salvar.');
+                }
+            } finally {
+                btn.disabled = false;
+            }
+        }
 
         /* ——— Gerenciar Abas (modal na página de cards) ——— */
         function openTabsManagerModal() {

@@ -29,6 +29,16 @@ class Dvr extends Model
         return $this->hasMany(Camera::class)->orderBy('ordem')->orderBy('created_at');
     }
 
+    public function fotos()
+    {
+        return $this->hasMany(DvrFoto::class)->orderByDesc('created_at');
+    }
+
+    public function latestFoto()
+    {
+        return $this->hasOne(DvrFoto::class)->latestOfMany();
+    }
+
     public function cameraChecklists()
     {
         return $this->hasMany(CameraChecklist::class, 'dvr_id');

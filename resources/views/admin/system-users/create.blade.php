@@ -36,6 +36,45 @@
             @enderror
         </div>
 
+        <!-- Grupo de navegação -->
+        <div id="wrap_user_group_id">
+            <label for="user_group_id" class="block text-sm font-medium text-gray-700">Grupo de acesso *</label>
+            <select name="user_group_id" id="user_group_id" required
+                    class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                @foreach($groups as $g)
+                    @if($g->slug !== \App\Models\UserGroup::SLUG_ADMINISTRADORES)
+                        <option value="{{ $g->id }}" @selected($g->slug === \App\Models\UserGroup::SLUG_USUARIOS)>{{ $g->name }}</option>
+                    @endif
+                @endforeach
+            </select>
+            <p class="mt-1 text-xs text-gray-500">Define quais abas e áreas do menu o usuário enxerga. O grupo <strong>Administradores</strong> só é aplicado ao marcar “Usuário Administrador” abaixo.</p>
+            @error('user_group_id')
+                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+            @enderror
+        </div>
+
+        <!-- Serviços operacionais (além do menu) -->
+        <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Serviços que o usuário pode executar</label>
+            <p class="text-xs text-gray-500 mb-3">Recursos como checklists na aba Câmeras. <strong>Usuário administrador</strong> (marcado abaixo) ignora esta lista e tem acesso a todos os serviços.</p>
+            <div class="space-y-2">
+                @foreach(\App\Support\UserService::labels() as $serviceKey => $serviceLabel)
+                    <label class="flex items-start gap-2 cursor-pointer">
+                        <input type="checkbox" name="enabled_services[]" value="{{ $serviceKey }}"
+                               class="mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                               @checked(in_array($serviceKey, old('enabled_services', []), true))>
+                        <span class="text-sm text-gray-800">{{ $serviceLabel }}</span>
+                    </label>
+                @endforeach
+            </div>
+            @error('enabled_services')
+                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+            @enderror
+            @error('enabled_services.*')
+                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+            @enderror
+        </div>
+
         <!-- Tipo de Usuário -->
         <div>
             <label class="block text-sm font-medium text-gray-700 mb-3">Tipo de Usuário</label>
@@ -47,9 +86,9 @@
                     </div>
                     <div class="ml-3 text-sm">
                         <label for="is_admin" class="font-medium text-gray-700 cursor-pointer">
-                            Usuário Administrador
+                            Usuário Administrador (acesso total + permissões de edição no painel)
                         </label>
-                        <p class="text-gray-500">Se marcado, o usuário terá acesso total ao sistema (pode gerenciar usuários, ver todos os logins, editar, excluir, etc.). Se não marcado, será um usuário comum com acesso restrito apenas aos logins com permissão específica.</p>
+                        <p class="text-gray-500">Marque para conceder permissões administrativas completas (senhas, logins, usuários) e vincular ao grupo <strong>Administradores</strong> automaticamente.</p>
                     </div>
                 </div>
             </div>

@@ -17,11 +17,11 @@
                     <i class="fas fa-expand-alt"></i> Tela cheia
                 </button>
             @endif
-            @if($filiaisMode)
+            @if($filiaisMode && auth()->guard('web')->check() && auth()->user()->canAccessNav(\App\Support\NavPermission::ADMIN_NETWORK_MAPS))
                 <a href="{{ route('admin.network-maps.index') }}" class="inline-flex items-center px-4 py-2 btn-engehub-yellow border border-transparent rounded-md font-semibold text-xs uppercase tracking-widest transition">
                     <i class="fas fa-cog mr-2"></i> Gerenciar Mapas de Rede
                 </a>
-            @else
+            @elseif(!$filiaisMode)
                 <a href="{{ route('admin.network-maps.edit', $network_map) }}" class="inline-flex items-center px-4 py-2 btn-engehub-yellow border border-transparent rounded-md font-semibold text-xs uppercase tracking-widest transition">
                     <i class="fas fa-edit mr-2"></i> Editar
                 </a>
@@ -96,8 +96,8 @@
                         @endif
                         <div class="mapa-rede-forcelight border-2 border-gray-300 rounded-lg overflow-hidden shadow-inner relative" style="height: 70vh; background: #ffffff !important;">
                             @include('admin.network-maps.partials.map-layer-filters')
-                            <div class="absolute top-3 right-3 z-30 flex flex-wrap items-center justify-end gap-2 max-w-[calc(100%-1rem)] pointer-events-auto" role="toolbar" aria-label="Controles do mapa">
-                                <div class="flex flex-wrap items-center gap-1.5 rounded-lg bg-white/95 shadow-lg border border-gray-200 p-1.5 backdrop-blur-sm" role="search" aria-label="Buscar colaborador no mapa">
+                            <div class="absolute top-3 right-3 z-40 flex flex-wrap items-center justify-end gap-2 max-w-[calc(100%-1rem)] pointer-events-auto" role="toolbar" aria-label="Controles do mapa">
+                                <div id="mapTutorialSearchWrap" class="flex flex-wrap items-center gap-1.5 rounded-lg bg-white/95 shadow-lg border border-gray-200 p-1.5 backdrop-blur-sm" role="search" aria-label="Buscar colaborador no mapa">
                                     <input type="search" id="mapCollaboratorSearch" name="map_collaborator_search" placeholder="Buscar colaborador…" autocomplete="off" class="text-sm rounded-md border border-gray-300 px-2 py-1.5 w-36 sm:w-44 min-w-0 bg-white text-gray-900 shadow-sm focus:border-amber-500 focus:ring-1 focus:ring-amber-500">
                                     <div id="mapSearchNav" class="hidden flex items-center gap-0.5 shrink-0">
                                         <button type="button" id="mapSearchPrev" class="w-8 h-8 flex items-center justify-center rounded-md bg-gray-100 hover:bg-gray-200 text-gray-800 text-lg font-semibold leading-none" title="Resultado anterior">&lsaquo;</button>
@@ -106,11 +106,11 @@
                                     </div>
                                     <span id="mapSearchFeedback" class="hidden text-xs text-amber-800 max-w-[12rem] leading-tight"></span>
                                 </div>
-                                <div class="flex items-center gap-1.5 rounded-lg bg-white/95 shadow-lg border border-gray-200 p-1.5 backdrop-blur-sm" role="group" aria-label="Rótulos no mapa">
+                                <div id="mapTutorialLabelToggles" class="flex items-center gap-1.5 rounded-lg bg-white/95 shadow-lg border border-gray-200 p-1.5 backdrop-blur-sm" role="group" aria-label="Rótulos no mapa">
                                     <button type="button" id="mapShowCodes" class="px-2.5 py-1.5 rounded-md text-sm font-medium border border-gray-400 btn-engehub-yellow transition-colors">Códigos</button>
                                     <button type="button" id="mapShowNames" class="px-2.5 py-1.5 rounded-md text-sm font-medium border border-gray-300 bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">Nomes</button>
                                 </div>
-                                <div class="flex items-center gap-1.5 rounded-lg bg-white/95 shadow-lg border border-gray-200 p-1.5 backdrop-blur-sm" role="group" aria-label="Zoom do mapa">
+                                <div id="mapTutorialZoomControls" class="flex items-center gap-1.5 rounded-lg bg-white/95 shadow-lg border border-gray-200 p-1.5 backdrop-blur-sm" role="group" aria-label="Zoom do mapa">
                                     <button type="button" id="mapZoomOut" class="w-9 h-9 flex items-center justify-center rounded-md bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium text-lg transition-colors" title="Diminuir zoom">−</button>
                                     <span id="zoomLevel" class="text-sm font-semibold text-gray-700 min-w-[3rem] text-center px-1">100%</span>
                                     <button type="button" id="mapZoomIn" class="w-9 h-9 flex items-center justify-center rounded-md bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium text-lg transition-colors" title="Aumentar zoom">+</button>
@@ -118,7 +118,7 @@
                                 </div>
                             </div>
                             <div id="mapaContainer" class="relative z-0 w-full h-full overflow-hidden cursor-grab" style="touch-action: none; background: #ffffff !important;">
-                                <div id="svgWrapper" class="inline-block p-4" style="transform-origin: 0 0; will-change: transform; background: #ffffff;">
+                                <div id="svgWrapper" class="mapa-rede-svg-wrapper inline-block p-4">
                                     <div id="svgContainer" class="svg-map-theme" style="background: #ffffff !important;">
                                         {!! $svgContent !!}
                                     </div>
@@ -186,12 +186,12 @@
         .svg-map-theme [data-code].device:hover { fill: #b45309 !important; }
         .svg-map-theme foreignObject [data-code].device:hover { color: #b45309 !important; }
         .svg-map-theme .device.device-search-highlight {
-            filter: drop-shadow(0 0 3px #E9B32C) drop-shadow(0 0 6px rgba(233, 179, 44, 0.85));
-            transition: filter 0.35s ease;
+            filter: drop-shadow(0 0 1px #E9B32C) drop-shadow(0 0 3px rgba(233, 179, 44, 0.65));
+            transition: filter 0.25s ease;
         }
         .svg-map-theme foreignObject .device.device-search-highlight {
-            box-shadow: 0 0 0 2px #E9B32C, 0 0 12px rgba(233, 179, 44, 0.6);
-            transition: box-shadow 0.35s ease;
+            box-shadow: 0 0 0 2px #E9B32C, 0 0 12px rgba(233, 179, 44, 0.5);
+            transition: box-shadow 0.25s ease;
         }
         .svg-map-theme .device.map-layer-filter-hidden {
             visibility: hidden !important;
@@ -201,7 +201,19 @@
             visibility: hidden !important;
             pointer-events: none !important;
         }
-        #mapaContainer svg { max-width: none !important; height: auto !important; }
+        #mapaContainer svg {
+            max-width: none !important;
+            height: auto !important;
+            text-rendering: geometricPrecision;
+            shape-rendering: geometricPrecision;
+        }
+        #mapaContainer svg text,
+        #mapaContainer svg tspan { text-rendering: geometricPrecision; }
+        #mapaContainer svg image {
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: crisp-edges;
+        }
+        #svgWrapper.mapa-rede-svg-wrapper { transform-origin: 0 0; }
         .filiais-fs-map-host { display: flex; flex-direction: column; }
         .mapa-rede-forcelight.filiais-map-fullscreen-panel { flex: 1; min-height: 0; height: 100% !important; }
         #deviceSidePanel.map-device-panel {
@@ -246,6 +258,7 @@
         'deviceLabels' => $deviceLabels ?? [],
     ])
     </script>
+    @include('admin.network-maps.partials.network-map-tutorial')
     @endif
 
     @if($filiaisMode && $svgContent)

@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\NavPermission;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -10,59 +11,52 @@ use Symfony\Component\HttpFoundation\Response;
 class CheckAdminAccess
 {
     /**
-     * Handle an incoming request.
-     *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
+     * Acesso à área admin: usuário web com permissão específica da rota (grupo) ou acesso total (legacy).
      */
     public function handle(Request $request, Closure $next): Response
     {
-        // Log para debug
-        \Log::info('CheckAdminAccess middleware - Verificando acesso administrativo', [
-            'url' => $request->url(),
-            'method' => $request->method(),
-            'web_auth' => Auth::guard('web')->check(),
-            'system_auth' => Auth::guard('system')->check(),
-            'web_user_id' => Auth::guard('web')->check() ? Auth::guard('web')->id() : null,
-            'system_user_id' => Auth::guard('system')->check() ? Auth::guard('system')->id() : null,
-            'ip' => $request->ip()
-        ]);
-        
-        // Verificar se é um usuário administrativo (guard 'web')
-        if (Auth::guard('web')->check()) {
-            $user = Auth::guard('web')->user();
-            
-            // Verificar se o usuário tem permissões administrativas (acesso total)
-            if ($user && $user->hasFullAccess()) {
-                \Log::info('CheckAdminAccess - Acesso administrativo concedido', [
-                    'user_id' => $user->id,
-                    'user_name' => $user->name,
-                    'url' => $request->url()
-                ]);
-                return $next($request);
-            }
+        if (! Auth::guard('web')->check()) {
+            return $this->deny($request);
         }
-        
-        // Se chegou até aqui, é usuário sem permissões administrativas
-        \Log::warning('CheckAdminAccess - Acesso negado', [
-            'url' => $request->url(),
-            'web_auth' => Auth::guard('web')->check(),
-            'system_auth' => Auth::guard('system')->check(),
-            'web_user_id' => Auth::guard('web')->check() ? Auth::guard('web')->id() : null,
-            'system_user_id' => Auth::guard('system')->check() ? Auth::guard('system')->id() : null,
-            'ip' => $request->ip(),
-            'user_agent' => $request->userAgent()
-        ]);
-        
-        // Se for requisição AJAX, retornar JSON
+
+        $user = Auth::guard('web')->user();
+
+        if ($user->hasFullAccess()) {
+            return $next($request);
+        }
+
+        if ($user->userGroup?->full_access) {
+            return $next($request);
+        }
+
+        if (! $user->canAccessAnyAdminNav()) {
+            return $this->deny($request);
+        }
+
+        $routeName = $request->route()?->getName();
+        $key = NavPermission::adminRouteToNavKey($routeName);
+
+        if ($key === null) {
+            return $this->deny($request);
+        }
+
+        if (! $user->canAccessNav($key)) {
+            return $this->deny($request);
+        }
+
+        return $next($request);
+    }
+
+    private function deny(Request $request): Response
+    {
         if ($request->ajax() || $request->wantsJson()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Acesso negado. Você não tem permissões para acessar esta área.',
-                'error' => 'Forbidden'
+                'error' => 'Forbidden',
             ], 403);
         }
-        
-        // Retornar erro 403 Forbidden
+
         abort(403, 'Acesso negado. Você não tem permissões para acessar esta área administrativa.');
     }
 }

@@ -4,12 +4,13 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Models\UserGroup;
 use App\Models\UserPermission;
-use App\Models\Card;
 use App\Models\SystemUser;
+use App\Support\UserService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class SystemUserController extends Controller
 {
@@ -18,9 +19,11 @@ class SystemUserController extends Controller
      */
     public function index()
     {
-        $users = User::where('id', '!=', 1)->get(); // Excluir o admin principal
-        
-        return view('admin.system-users.index', compact('users'));
+        $users = User::with('userGroup')->orderBy('id')->get();
+
+        $userGroups = UserGroup::orderBy('name')->get();
+
+        return view('admin.system-users.index', compact('users', 'userGroups'));
     }
 
     /**
@@ -28,11 +31,12 @@ class SystemUserController extends Controller
      */
     public function create()
     {
+        $groups = UserGroup::orderBy('name')->get();
         if (request()->ajax() || request()->wantsJson()) {
-            return view('admin.system-users.create');
+            return view('admin.system-users.create', compact('groups'));
         }
-        
-        return view('admin.system-users.create');
+
+        return view('admin.system-users.create', compact('groups'));
     }
 
     /**
@@ -40,14 +44,24 @@ class SystemUserController extends Controller
      */
     public function store(Request $request)
     {
+        $adminGroupId = UserGroup::where('slug', UserGroup::SLUG_ADMINISTRADORES)->value('id');
+
         $request->validate([
             'name' => 'required|string|max:255',
             'username' => 'required|string|max:255|unique:users,username',
             'password' => 'required|string|min:6',
-            'is_admin' => 'boolean'
+            'is_admin' => 'boolean',
+            'user_group_id' => 'required|exists:user_groups,id',
+            'enabled_services' => 'nullable|array',
+            'enabled_services.*' => ['string', Rule::in(UserService::allKeys())],
         ]);
 
         try {
+            $isAdmin = $request->boolean('is_admin');
+            $userGroupId = $isAdmin && $adminGroupId
+                ? (int) $adminGroupId
+                : (int) $request->input('user_group_id');
+
             // Criar usuário do Laravel para login no sistema
             $user = User::create([
                 'name' => $request->name,
@@ -55,10 +69,11 @@ class SystemUserController extends Controller
                 'email' => $request->username . '@engepecas.com',
                 'password' => Hash::make($request->password),
                 'email_verified_at' => now(),
+                'user_group_id' => $userGroupId,
+                'enabled_services' => $isAdmin ? null : $this->normalizeEnabledServices($request),
             ]);
 
             // Criar permissões baseado no tipo de usuário
-            $isAdmin = $request->boolean('is_admin');
             
             if ($isAdmin) {
                 // Usuário Administrador - todas as permissões
@@ -106,7 +121,9 @@ class SystemUserController extends Controller
      */
     public function edit(User $user)
     {
-        return view('admin.system-users.edit', compact('user'));
+        $groups = UserGroup::orderBy('name')->get();
+
+        return view('admin.system-users.edit', compact('user', 'groups'));
     }
 
     /**
@@ -117,15 +134,26 @@ class SystemUserController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'username' => 'required|string|max:255|unique:users,username,' . $user->id,
-            'password' => 'nullable|string|min:6'
+            'password' => 'nullable|string|min:6',
+            'user_group_id' => 'required|exists:user_groups,id',
+            'enabled_services' => 'nullable|array',
+            'enabled_services.*' => ['string', Rule::in(UserService::allKeys())],
         ]);
 
         try {
+            $groupId = (int) $request->input('user_group_id');
+            $group = UserGroup::find($groupId);
+
             $data = [
                 'name' => $request->name,
                 'username' => $request->username,
-                'email' => $request->username . '@engepecas.com'
+                'email' => $request->username . '@engepecas.com',
+                'user_group_id' => $groupId,
             ];
+
+            if ($group && ! $group->full_access) {
+                $data['enabled_services'] = $this->normalizeEnabledServices($request);
+            }
 
             // Só atualiza a senha se foi fornecida
             if ($request->filled('password')) {
@@ -133,6 +161,14 @@ class SystemUserController extends Controller
             }
 
             $user->update($data);
+            $user->refresh();
+            if ($user->userGroup) {
+                $this->syncLegacyUserPermissionsFromGroup($user, $user->userGroup);
+                $user->refresh();
+            }
+            if ($user->userGroup?->full_access || $user->hasFullAccess()) {
+                $user->forceFill(['enabled_services' => null])->saveQuietly();
+            }
 
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json([
@@ -161,6 +197,15 @@ class SystemUserController extends Controller
      */
     public function destroy(User $user)
     {
+        if ($user->id === 1) {
+            $msg = 'A conta principal do sistema (id 1) não pode ser removida.';
+            if (request()->ajax() || request()->wantsJson()) {
+                return response()->json(['success' => false, 'message' => $msg], 422);
+            }
+
+            return redirect()->route('admin.system-users.index')->with('error', $msg);
+        }
+
         try {
             // Remove as permissões do usuário
             $user->userPermissions()->delete();
@@ -190,100 +235,58 @@ class SystemUserController extends Controller
         }
     }
 
-
     /**
-     * Exibe o formulário de permissões do usuário
+     * Mantém user_permissions alinhado ao grupo (legado: isAdmin(), cartões, logins).
      */
-    public function permissions(User $user)
+    /**
+     * Lista normalizada de serviços habilitados. Vazio = nenhum; todos os conhecidos = null (equivalente a “todos”).
+     *
+     * @return list<string>|null
+     */
+    private function normalizeEnabledServices(Request $request): ?array
     {
-        // Sistema simplificado: apenas Administrador ou Usuário Comum
-        $isAdmin = $user->isAdmin();
-        
-        $permissions = [
-            'is_admin' => [
-                'label' => 'Administrador',
-                'description' => 'Acesso total ao sistema administrativo (gerenciar usuários, ver todos os logins, editar, excluir, etc.)',
-                'active' => $isAdmin
-            ],
-            'is_user' => [
-                'label' => 'Usuário Comum',
-                'description' => 'Acesso restrito apenas aos logins com permissão específica (não pode editar, gerenciar ou excluir)',
-                'active' => !$isAdmin
-            ]
-        ];
-
-        if (request()->ajax() || request()->wantsJson()) {
-            return response()->json([
-                'html' => view('admin.system-users.permissions', compact('user', 'permissions'))->render()
-            ]);
+        $raw = $request->input('enabled_services', []);
+        if (! is_array($raw)) {
+            $raw = [];
         }
-        
-        return view('admin.system-users.permissions', compact('user', 'permissions'));
+        $valid = UserService::allKeys();
+        $picked = array_values(array_unique(array_intersect($raw, $valid)));
+        if (count($picked) >= count($valid)) {
+            return null;
+        }
+
+        return $picked;
     }
 
-    /**
-     * Atualiza as permissões do usuário
-     */
-    public function updatePermissions(Request $request, User $user)
+    private function syncLegacyUserPermissionsFromGroup(User $user, UserGroup $group): void
     {
-        $request->validate([
-            'permissions' => 'array',
-            'permissions.*' => 'in:is_admin,is_user'
-        ]);
+        $user->userPermissions()->delete();
 
-        try {
-            // Remove todas as permissões atuais
-            $user->userPermissions()->delete();
-            
-            // Adiciona as novas permissões baseadas na seleção
-            $permissions = $request->input('permissions', []);
-            
-            if (in_array('is_admin', $permissions)) {
-                // Se é administrador, adiciona todas as permissões
-                UserPermission::create([
-                    'user_id' => $user->id,
-                    'permission_type' => UserPermission::VIEW_PASSWORDS,
-                    'is_active' => true
-                ]);
-                UserPermission::create([
-                    'user_id' => $user->id,
-                    'permission_type' => UserPermission::MANAGE_SYSTEM_USERS,
-                    'is_active' => true
-                ]);
-                UserPermission::create([
-                    'user_id' => $user->id,
-                    'permission_type' => UserPermission::FULL_ACCESS,
-                    'is_active' => true
-                ]);
-            } else {
-                // Se é usuário comum, adiciona apenas permissão para ver senhas
-                UserPermission::create([
-                    'user_id' => $user->id,
-                    'permission_type' => UserPermission::VIEW_PASSWORDS,
-                    'is_active' => true
-                ]);
-            }
+        if ($group->full_access) {
+            UserPermission::create([
+                'user_id' => $user->id,
+                'permission_type' => UserPermission::VIEW_PASSWORDS,
+                'is_active' => true,
+            ]);
+            UserPermission::create([
+                'user_id' => $user->id,
+                'permission_type' => UserPermission::MANAGE_SYSTEM_USERS,
+                'is_active' => true,
+            ]);
+            UserPermission::create([
+                'user_id' => $user->id,
+                'permission_type' => UserPermission::FULL_ACCESS,
+                'is_active' => true,
+            ]);
 
-            if ($request->ajax() || $request->wantsJson()) {
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Permissões atualizadas com sucesso!'
-                ]);
-            }
-            
-            return redirect()->route('admin.system-users.index')
-                           ->with('success', 'Permissões atualizadas com sucesso!');
-                           
-        } catch (\Exception $e) {
-            if ($request->ajax() || $request->wantsJson()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Erro ao atualizar permissões: ' . $e->getMessage()
-                ], 500);
-            }
-            
-            return back()->with('error', 'Erro ao atualizar permissões: ' . $e->getMessage());
+            return;
         }
+
+        UserPermission::create([
+            'user_id' => $user->id,
+            'permission_type' => UserPermission::VIEW_PASSWORDS,
+            'is_active' => true,
+        ]);
     }
 
     /**
