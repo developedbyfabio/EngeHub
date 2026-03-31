@@ -134,6 +134,7 @@ Route::middleware(['auth.any', 'admin.access'])->prefix('admin')->name('admin.')
     Route::post('/sectors/{sector}/secret-url/expiration', [SectorController::class, 'setSecretUrlExpiration'])->name('sectors.secret-url.expiration');
 
     // Mapas de Rede
+    Route::get('network-maps/{network_map}/svg-floor', [NetworkMapController::class, 'svgFloorJson'])->name('network-maps.svg-floor');
     Route::resource('network-maps', NetworkMapController::class);
     Route::post('network-maps/{networkMap}/toggle-status', [NetworkMapController::class, 'toggleStatus'])->name('network-maps.toggle-status');
     Route::get('network-maps/{network_map}/devices/{type}/{code}', [NetworkMapController::class, 'getDevice'])->name('network-maps.devices.get');
@@ -226,6 +227,7 @@ Route::middleware(['auth.any', 'admin.access'])->prefix('admin')->name('admin.')
 // Filiais — visualização dos mapas de rede ativos (mesmo layout do mapa admin)
 Route::middleware(['auth.any', 'nav.access:filiais'])->prefix('filiais')->name('filiais.')->group(function () {
     Route::get('/', [FiliaisController::class, 'index'])->name('index');
+    Route::get('/network-maps/{network_map}/svg-floor', [FiliaisController::class, 'mapSvgContent'])->name('network-maps.svg-floor');
     Route::get('/network-maps/{network_map}/devices/{type}/{code}', [FiliaisController::class, 'getDevice'])->name('network-maps.devices.get');
 });
 

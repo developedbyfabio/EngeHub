@@ -42,7 +42,7 @@ final class NavPermission
             self::HOME => 'Início',
             self::SERVERS => 'Servidores',
             self::CAMERAS => 'Câmeras',
-            self::FILIAIS => 'Filiais',
+            self::FILIAIS => 'Mapas de Rede',
             self::ADMIN_CAMERAS => 'Gerenciar · Câmeras',
             self::ADMIN_CARDS => 'Gerenciar · Cards (abas, categorias, logins, data centers)',
             self::ADMIN_FORMS => 'Gerenciar · Formulários e Checklists',

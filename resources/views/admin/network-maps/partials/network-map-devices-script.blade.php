@@ -1096,6 +1096,31 @@
         initDeviceMarkers();
         setTimeout(initDeviceMarkers, 200);
 
+        window.__enghubMapRebindAfterSvgSwap = function() {
+            hideDeviceSidePanel();
+            initDeviceMarkers();
+            setTimeout(initDeviceMarkers, 200);
+            mapResetZoom();
+            applyMapLayerFilters();
+            clearSeatSearchHighlight();
+            seatSearchResults = [];
+            seatSearchIndex = 0;
+            updateSeatSearchStatusUI();
+            var si = document.getElementById('mapCollaboratorSearch');
+            if (si) {
+                si.value = '';
+            }
+            var fb = document.getElementById('mapSearchFeedback');
+            if (fb) {
+                fb.classList.add('hidden');
+                fb.textContent = '';
+            }
+            var nav = document.getElementById('mapSearchNav');
+            if (nav) {
+                nav.classList.add('hidden');
+            }
+        };
+
         var seatForm = document.getElementById('deviceSeatEditForm');
         var seatPhotoInput = document.getElementById('deviceSeatEditWorkstationPhoto');
         var seatPhotoPreviewWrap = document.getElementById('deviceSeatEditPhotoPreviewWrap');

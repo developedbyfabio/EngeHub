@@ -4,34 +4,49 @@
     var LS_NEVER = 'engehub_network_map_tutorial_never';
     var LS_AUTO_DONE = 'engehub_network_map_tutorial_auto_v1_done';
 
-    var steps = [
-        {
-            selector: '#mapFilterToggleBtn',
-            title: 'Filtro e camadas',
-            body: 'Use este botão para abrir <strong>Camadas do mapa</strong>. Você pode mostrar ou ocultar tomadas, mesas, impressoras, TVs, telefones e access points — a alteração é imediata.'
-        },
-        {
-            selector: '#mapTutorialSearchWrap',
-            title: 'Buscar colaborador',
-            body: 'Digite um nome para localizar a <strong>mesa</strong> no desenho. Quando houver vários resultados, use as setas para navegar entre eles.'
-        },
-        {
-            selector: '#mapTutorialLabelToggles',
-            title: 'Códigos e nomes',
-            body: 'Alterne entre <strong>Códigos</strong> (identificadores técnicos) e <strong>Nomes</strong> (pessoa ou recurso) exibidos nas mesas e equipamentos.'
-        },
-        {
-            selector: '#mapTutorialZoomControls',
-            title: 'Zoom e visão',
-            body: 'Use <strong>+</strong> e <strong>−</strong> para ampliar ou reduzir o mapa. <strong>Reset</strong> restaura o zoom inicial e a posição.'
-        },
-        {
-            randomDevice: true,
-            selector: '#mapaContainer',
-            title: 'Detalhes ao clicar',
-            body: 'Clique em uma <strong>mesa</strong>, <strong>tomada</strong>, impressora ou outro elemento no desenho (como o exemplo destacado) para abrir o painel com <strong>informações</strong> do item. Se você tiver permissão de edição, também poderá alterar dados por ali.'
+    /** Montado em startTour: 6 passos com dois andares, 5 passos com um só. */
+    var steps = [];
+
+    function buildSteps() {
+        var s = [
+            {
+                selector: '#mapFilterToggleBtn',
+                title: 'Filtro e camadas',
+                body: 'Use este botão para abrir <strong>Camadas do mapa</strong>. Você pode mostrar ou ocultar tomadas, mesas, impressoras, TVs, telefones e access points — a alteração é imediata.'
+            },
+            {
+                selector: '#mapTutorialSearchWrap',
+                title: 'Buscar colaborador',
+                body: 'Digite um nome para localizar a <strong>mesa</strong> no desenho. Quando houver vários resultados, use as setas para navegar entre eles.'
+            }
+        ];
+        if (document.getElementById('mapFloorToolbar')) {
+            s.push({
+                selector: '#mapFloorToolbar',
+                title: '1º e 2º andar',
+                body: 'Este mapa tem <strong>dois andares</strong>. Use <strong>1º Andar</strong> e <strong>2º Andar</strong> para alternar o desenho e os equipamentos — a troca é feita na hora, sem sair da página.'
+            });
         }
-    ];
+        s.push(
+            {
+                selector: '#mapTutorialLabelToggles',
+                title: 'Códigos e nomes',
+                body: 'Alterne entre <strong>Códigos</strong> (identificadores técnicos) e <strong>Nomes</strong> (pessoa ou recurso) exibidos nas mesas e equipamentos.'
+            },
+            {
+                selector: '#mapTutorialZoomControls',
+                title: 'Zoom e visão',
+                body: 'Use <strong>+</strong> e <strong>−</strong> para ampliar ou reduzir o mapa. <strong>Reset</strong> restaura o zoom inicial e a posição.'
+            },
+            {
+                randomDevice: true,
+                selector: '#mapaContainer',
+                title: 'Detalhes ao clicar',
+                body: 'Clique em uma <strong>mesa</strong>, <strong>tomada</strong>, impressora ou outro elemento no desenho (como o exemplo destacado) para abrir o painel com <strong>informações</strong> do item. Se você tiver permissão de edição, também poderá alterar dados por ali.'
+            }
+        );
+        return s;
+    }
 
     var backdropEl = null;
     var tooltipEl = null;
@@ -40,7 +55,7 @@
     var currentIndex = -1;
     var lastTarget = null;
     var tourListenersOn = false;
-    /** Passo 5/5: balão fixo à esquerda da área do mapa (sem seguir o retângulo da mesa). */
+    /** Último passo: balão fixo à esquerda da área do mapa (sem seguir o retângulo da mesa). */
     var useLeftAnchoredTooltip = false;
 
     function shouldAutoStart() {
@@ -206,11 +221,11 @@
                     target.dataset.nmtTutorialPosition = '1';
                 }
                 target.classList.add(highlightClass);
-                target.style.zIndex = '273';
+                target.style.zIndex = '115';
             }
         }
 
-        /* Passo 5: destaque + teletransporte via transform (sem scroll) no bloco abaixo. */
+        /* Passo “detalhes ao clicar”: destaque + foco no dispositivo (sem scroll forçado no bloco abaixo). */
 
         var titleEl = document.getElementById('nmt-title');
         var bodyEl = document.getElementById('nmt-body');
@@ -242,12 +257,12 @@
 
         backdropEl = document.createElement('div');
         backdropEl.id = 'nmt-backdrop';
-        backdropEl.className = 'fixed inset-0 z-[270] bg-black/40';
+        backdropEl.className = 'fixed inset-0 z-[110] bg-black/40';
         backdropEl.setAttribute('aria-hidden', 'true');
 
         tooltipEl = document.createElement('div');
         tooltipEl.id = 'nmt-tooltip';
-        tooltipEl.className = 'fixed z-[272] w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-gray-200 bg-white p-4 shadow-2xl pointer-events-auto';
+        tooltipEl.className = 'fixed z-[130] w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-gray-200 bg-white p-4 shadow-2xl pointer-events-auto';
         tooltipEl.setAttribute('role', 'dialog');
         tooltipEl.setAttribute('aria-modal', 'true');
         tooltipEl.innerHTML =
@@ -289,7 +304,8 @@
     }
 
     function startTour() {
-        if (!document.querySelector(steps[0].selector)) return;
+        steps = buildSteps();
+        if (!steps.length || !document.querySelector(steps[0].selector)) return;
         buildUi();
         showStep(0);
     }
@@ -304,9 +320,7 @@
         }
         if (shouldAutoStart()) {
             setTimeout(function() {
-                if (document.querySelector(steps[0].selector)) {
-                    startTour();
-                }
+                startTour();
             }, 850);
         }
     }
@@ -326,7 +340,7 @@
     border-radius: 0.375rem;
 }
 body.network-map-tutorial-active #nmt-backdrop {
-    pointer-events: none;
+    pointer-events: auto;
 }
 body.network-map-tutorial-active #nmt-tooltip {
     pointer-events: auto;

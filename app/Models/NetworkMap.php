@@ -14,11 +14,14 @@ class NetworkMap extends Model
         'name',
         'file_name',
         'file_path',
+        'file_name_floor2',
+        'has_two_floors',
         'is_active',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
+        'has_two_floors' => 'boolean',
     ];
 
     /**
@@ -44,6 +47,11 @@ class NetworkMap extends Model
         return public_path($this->file_path . $this->file_name);
     }
 
+    public function getFullPathFloor2Attribute(): string
+    {
+        return public_path($this->file_path.($this->file_name_floor2 ?? ''));
+    }
+
     public function getFileUrlAttribute()
     {
         return asset($this->file_path . $this->file_name);
@@ -52,6 +60,11 @@ class NetworkMap extends Model
     public function fileExists()
     {
         return file_exists($this->full_path);
+    }
+
+    public function fileExistsFloor2(): bool
+    {
+        return (bool) ($this->file_name_floor2 && file_exists($this->full_path_floor2));
     }
 
     public function getSvgContent()
@@ -63,22 +76,42 @@ class NetworkMap extends Model
         return null;
     }
 
-    /**
-     * Lê SVG, detecta rótulos (Device::parseSvgLabel) em text/tspan/foreignObject.
-     *
-     * Para cada dispositivo no SVG: {@see firstOrCreate} por (network_map_id, type, code).
-     * Registros já existentes não são alterados (metadata, observações, setor, etc. mantidos).
-     * Dispositivos que deixaram de aparecer no SVG não são apagados.
-     *
-     * @return int Quantidade de dispositivos únicos encontrados no SVG (incluindo os que já existiam)
-     */
-    public function syncDevicesFromSvg(): int
+    public function getSvgContentForFloor(int $floor): ?string
     {
-        $content = $this->getSvgContent();
-        if (! $content) {
-            return 0;
+        $floor = $floor === 2 ? 2 : 1;
+
+        if ($floor === 1) {
+            return $this->getSvgContent();
         }
 
+        if (! $this->has_two_floors || ! $this->fileExistsFloor2()) {
+            return null;
+        }
+
+        return file_get_contents($this->full_path_floor2);
+    }
+
+    /**
+     * @return array<int, string> Conteúdo bruto de cada SVG usado na sincronização (1º andar e, se houver, 2º).
+     */
+    protected function svgContentsForSync(): array
+    {
+        $out = [];
+        if ($this->fileExists()) {
+            $out[] = (string) file_get_contents($this->full_path);
+        }
+        if ($this->has_two_floors && $this->fileExistsFloor2()) {
+            $out[] = (string) file_get_contents($this->full_path_floor2);
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return array<string, array{type: string, code: string, full_code: string}>
+     */
+    protected function parseDevicesFromSvgContent(string $content): array
+    {
         libxml_use_internal_errors(true);
         $dom = new \DOMDocument;
         $dom->loadXML($content);
@@ -117,10 +150,31 @@ class NetworkMap extends Model
             }
         }
 
-        /** Dispositivos únicos neste SVG (chave no banco: network_map_id + type + code). Não usamos isto para apagar linhas antigas. */
-        $foundDevices = array_values($uniqueByFull);
+        return $uniqueByFull;
+    }
 
-        foreach ($foundDevices as $parsed) {
+    /**
+     * Lê SVG, detecta rótulos (Device::parseSvgLabel) em text/tspan/foreignObject.
+     *
+     * Para cada dispositivo no SVG: {@see firstOrCreate} por (network_map_id, type, code).
+     * Registros já existentes não são alterados (metadata, observações, setor, etc. mantidos).
+     * Dispositivos que deixaram de aparecer no SVG não são apagados.
+     *
+     * @return int Quantidade de dispositivos únicos encontrados no SVG (incluindo os que já existiam)
+     */
+    public function syncDevicesFromSvg(): int
+    {
+        $merged = [];
+        foreach ($this->svgContentsForSync() as $content) {
+            if ($content === '') {
+                continue;
+            }
+            foreach ($this->parseDevicesFromSvgContent($content) as $fullCode => $parsed) {
+                $merged[$fullCode] = $parsed;
+            }
+        }
+
+        foreach ($merged as $parsed) {
             $this->devices()->firstOrCreate(
                 [
                     'network_map_id' => $this->id,
@@ -133,6 +187,6 @@ class NetworkMap extends Model
             );
         }
 
-        return count($foundDevices);
+        return count($merged);
     }
 }

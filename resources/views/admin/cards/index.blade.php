@@ -178,7 +178,7 @@
     </div>
 
     <!-- Modal de Confirmação de Exclusão -->
-    <div id="deleteConfirmModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50 flex items-center justify-center delete-confirm-modal">
+    <div id="deleteConfirmModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-[110] flex items-center justify-center delete-confirm-modal">
         <div class="w-96 shadow-lg rounded-md bg-white delete-confirm-content">
             <div class="mt-3">
                 <div class="flex items-center justify-center w-12 h-12 mx-auto bg-red-100 rounded-full delete-confirm-icon">
@@ -204,7 +204,7 @@
     <div id="toastContainer" class="toast-container"></div>
 
     <!-- Modal de Criação -->
-    <div id="createModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50 flex items-center justify-center delete-confirm-modal p-4">
+    <div id="createModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-[110] flex items-center justify-center delete-confirm-modal p-4">
         <div class="w-full max-w-2xl max-h-[85vh] shadow-lg rounded-md bg-white modal-content delete-confirm-content flex flex-col">
             <div class="flex-shrink-0">
                 <div class="flex justify-between items-center mb-4 px-6 pt-4">
@@ -221,7 +221,7 @@
     </div>
 
     <!-- Modal de Edição -->
-    <div id="editModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50 flex items-center justify-center delete-confirm-modal p-4">
+    <div id="editModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-[110] flex items-center justify-center delete-confirm-modal p-4">
         <div class="w-full max-w-2xl max-h-[85vh] shadow-lg rounded-md bg-white modal-content delete-confirm-content flex flex-col">
             <div class="flex-shrink-0">
                 <div class="flex justify-between items-center mb-4 px-6 pt-4">
@@ -238,7 +238,7 @@
     </div>
 
     <!-- Modal de Logins do Card -->
-    <div id="cardLoginsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50 flex items-center justify-center delete-confirm-modal">
+    <div id="cardLoginsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-[110] flex items-center justify-center delete-confirm-modal">
         <div class="w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white modal-content delete-confirm-content">
             <div class="mt-3">
                 <div class="flex justify-between items-center mb-4 px-6 pt-4">
@@ -258,7 +258,7 @@
     </div>
 
     <!-- Modal de Criação de Login -->
-    <div id="createSystemLoginModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50 flex items-center justify-center delete-confirm-modal">
+    <div id="createSystemLoginModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-[120] flex items-center justify-center delete-confirm-modal">
         <div class="w-11/12 sm:w-3/4 md:w-2/3 lg:w-1/3 xl:w-1/4 shadow-lg rounded-md bg-white modal-content delete-confirm-content">
             <div class="mt-3">
                 <div class="flex justify-between items-center mb-4 px-6 pt-4">
@@ -275,7 +275,7 @@
     </div>
 
     <!-- Modal de Edição de Login -->
-    <div id="editSystemLoginModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50 flex items-center justify-center delete-confirm-modal">
+    <div id="editSystemLoginModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-[120] flex items-center justify-center delete-confirm-modal">
         <div class="w-11/12 sm:w-3/4 md:w-2/3 lg:w-1/3 xl:w-1/4 shadow-lg rounded-md bg-white modal-content delete-confirm-content">
             <div class="mt-3">
                 <div class="flex justify-between items-center mb-4 px-6 pt-4">
@@ -292,7 +292,7 @@
     </div>
 
     <!-- Modal de Categorias -->
-    <div id="categoriesModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50 flex items-center justify-center delete-confirm-modal">
+    <div id="categoriesModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-[110] flex items-center justify-center delete-confirm-modal">
         <div class="w-11/12 md:w-2/3 lg:w-1/2 shadow-lg rounded-md bg-white modal-content delete-confirm-content">
             <!-- Cabeçalho -->
             <div class="flex justify-between items-center mb-4 px-6 pt-4">
@@ -330,7 +330,7 @@
     </div>
 
     <!-- Modal matriz cards × grupos (visibilidade no Início) -->
-    <div id="cardGroupPermissionsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50 flex items-center justify-center delete-confirm-modal p-4">
+    <div id="cardGroupPermissionsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-[110] flex items-center justify-center delete-confirm-modal p-4">
         <div class="w-full max-w-[min(96vw,1400px)] max-h-[92vh] shadow-lg rounded-md bg-white modal-content delete-confirm-content flex flex-col">
             <div class="flex-shrink-0 flex justify-between items-center gap-3 px-6 pt-4 pb-3 border-b border-gray-100">
                 <h3 class="text-lg font-medium text-gray-900 flex items-center gap-2">
@@ -368,7 +368,7 @@
     </div>
 
     <!-- Modal Gerenciar Abas -->
-    <div id="tabsManagerModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50 flex items-center justify-center delete-confirm-modal p-4">
+    <div id="tabsManagerModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-[110] flex items-center justify-center delete-confirm-modal p-4">
         <div class="w-full max-w-4xl max-h-[90vh] shadow-lg rounded-md bg-white modal-content delete-confirm-content flex flex-col">
             <div class="flex-shrink-0 flex justify-between items-center gap-3 px-6 pt-4 pb-2 border-b border-gray-100">
                 <h3 class="text-lg font-medium text-gray-900 flex items-center gap-2">
@@ -454,7 +454,7 @@
     </div>
 
     <!-- Modal Nova Aba (formulário) -->
-    <div id="tabCreateModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-[60] flex items-center justify-center delete-confirm-modal p-4">
+    <div id="tabCreateModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-[120] flex items-center justify-center delete-confirm-modal p-4">
         <div class="w-full max-w-lg max-h-[90vh] shadow-lg rounded-md bg-white modal-content delete-confirm-content flex flex-col">
             <div class="flex-shrink-0 flex justify-between items-center px-6 pt-4 pb-2">
                 <h3 class="text-lg font-medium text-gray-900">Nova Aba</h3>
@@ -467,7 +467,7 @@
     </div>
 
     <!-- Modal Editar Aba -->
-    <div id="tabEditModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-[60] flex items-center justify-center delete-confirm-modal p-4">
+    <div id="tabEditModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-[120] flex items-center justify-center delete-confirm-modal p-4">
         <div class="w-full max-w-lg max-h-[90vh] shadow-lg rounded-md bg-white modal-content delete-confirm-content flex flex-col">
             <div class="flex-shrink-0 flex justify-between items-center px-6 pt-4 pb-2">
                 <h3 class="text-lg font-medium text-gray-900">Editar Aba</h3>
@@ -480,7 +480,7 @@
     </div>
 
     <!-- Modal confirmar exclusão de aba -->
-    <div id="tabDeleteConfirmModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-[60] flex items-center justify-center delete-confirm-modal">
+    <div id="tabDeleteConfirmModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-[120] flex items-center justify-center delete-confirm-modal">
         <div class="w-96 shadow-lg rounded-md bg-white delete-confirm-content">
             <div class="mt-3">
                 <div class="flex items-center justify-center w-12 h-12 mx-auto bg-red-100 rounded-full delete-confirm-icon">
@@ -503,7 +503,7 @@
     </div>
 
     <!-- Modal de Confirmação de Exclusão de Categoria -->
-    <div id="deleteCategoryConfirmModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50 flex items-center justify-center delete-confirm-modal">
+    <div id="deleteCategoryConfirmModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-[120] flex items-center justify-center delete-confirm-modal">
         <div class="w-96 shadow-lg rounded-md bg-white delete-confirm-content">
             <div class="mt-3">
                 <div class="flex items-center justify-center w-12 h-12 mx-auto bg-red-100 rounded-full delete-confirm-icon">

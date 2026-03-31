@@ -69,7 +69,7 @@
 </div>
 
 {{-- Modal Filiais --}}
-<div id="modal-filiais" class="fixed inset-0 bg-black bg-opacity-50 z-[10050] hidden items-center justify-center p-4">
+<div id="modal-filiais" class="fixed inset-0 bg-black bg-opacity-50 z-[110] hidden items-center justify-center p-4">
     <div class="modal-dark rounded-xl p-6 max-w-2xl w-full max-h-[75vh] overflow-y-auto" @click.stop>
         <div class="flex justify-between items-center mb-4">
             <h3 class="text-lg font-semibold text-white">Gerenciar Filiais</h3>
@@ -129,7 +129,7 @@
 </div>
 
 {{-- Modal Criar Filial (dentro do modal Filiais) --}}
-<div id="modal-filiais-create" class="fixed inset-0 bg-black bg-opacity-60 z-[10100] hidden items-center justify-center p-4">
+<div id="modal-filiais-create" class="fixed inset-0 bg-black bg-opacity-60 z-[120] hidden items-center justify-center p-4">
     <div class="modal-dark rounded-xl p-6 max-w-md w-full" @click.stop>
         <h3 class="text-lg font-semibold text-white mb-4">Nova Filial</h3>
         <form action="{{ route('admin.branches.store') }}" method="POST">
@@ -154,7 +154,7 @@
 </div>
 
 {{-- Modal Editar Filial --}}
-<div id="modal-filiais-edit" class="fixed inset-0 bg-black bg-opacity-60 z-[10100] hidden items-center justify-center p-4">
+<div id="modal-filiais-edit" class="fixed inset-0 bg-black bg-opacity-60 z-[120] hidden items-center justify-center p-4">
     <div class="modal-dark rounded-xl p-6 max-w-md w-full" @click.stop>
         <h3 class="text-lg font-semibold text-white mb-4">Editar Filial</h3>
         <form id="form-filiais-edit" method="POST">

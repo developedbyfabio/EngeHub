@@ -279,7 +279,7 @@
 </div>
 
 {{-- Modal Exportar PDF --}}
-<div id="modal-export-pdf" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden items-center justify-center p-4">
+<div id="modal-export-pdf" class="fixed inset-0 bg-black bg-opacity-50 z-[110] hidden items-center justify-center p-4">
     <div class="bg-white rounded-xl shadow-lg max-w-md w-full max-h-[90vh] overflow-hidden flex flex-col" @click.stop>
         <div class="p-5 border-b border-gray-200">
             <div class="flex justify-between items-center">

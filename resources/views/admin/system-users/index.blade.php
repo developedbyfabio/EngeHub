@@ -32,6 +32,27 @@
                     </div>
                 @endif
 
+                @if($users->isNotEmpty())
+                <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+                    <div class="flex-1 min-w-[200px]">
+                        <label for="system-users-search" class="block text-xs font-medium text-gray-500 mb-1">Buscar por nome ou usuário</label>
+                        <input type="search" id="system-users-search" autocomplete="off" placeholder="Ex.: Fabio ou fabio.lemes" class="w-full rounded-md border-gray-300 shadow-sm text-sm focus:border-primary-500 focus:ring-primary-500">
+                    </div>
+                    <div class="w-full sm:w-auto sm:min-w-[12rem]">
+                        <label for="system-users-filter-group" class="block text-xs font-medium text-gray-500 mb-1">Grupo</label>
+                        <select id="system-users-filter-group" class="w-full rounded-md border-gray-300 shadow-sm text-sm focus:border-primary-500 focus:ring-primary-500">
+                            <option value="">Todos os grupos</option>
+                            @foreach($userGroups as $g)
+                                <option value="{{ $g->id }}">{{ $g->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <button type="button" id="system-users-filter-reset" class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-xs font-medium text-gray-700 bg-white hover:bg-gray-50">
+                        <i class="fas fa-undo-alt mr-1.5 text-gray-400"></i> Limpar filtros
+                    </button>
+                </div>
+                @endif
+
                 <div class="overflow-x-auto">
                     <table class="min-w-full bg-white">
                         <thead class="bg-gray-50">
@@ -55,7 +76,7 @@
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
                             @forelse($users as $user)
-                                <tr>
+                                <tr class="system-user-row hover:bg-gray-50" data-search="{{ Str::lower($user->name.' '.$user->username) }}" data-group-id="{{ $user->user_group_id ?? '' }}">
                                     <td class="px-6 py-4 whitespace-nowrap">
                                         <div class="text-sm font-medium text-gray-900 flex flex-wrap items-center gap-2">
                                             <span>{{ $user->name }}</span>
@@ -114,6 +135,13 @@
                                     </td>
                                 </tr>
                             @endforelse
+                            @if($users->isNotEmpty())
+                                <tr id="system-users-filter-empty" class="hidden">
+                                    <td colspan="5" class="px-6 py-10 text-center text-sm text-gray-500">
+                                        Nenhum usuário corresponde aos filtros selecionados.
+                                    </td>
+                                </tr>
+                            @endif
                         </tbody>
                     </table>
                 </div>
@@ -122,17 +150,17 @@
     </div>
 </div>
 
-<!-- Modal de Criação -->
-<div id="createModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
-    <div class="flex items-center justify-center min-h-screen p-4">
-        <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4">
-            <div class="flex items-center justify-between p-6 border-b border-gray-200">
+<!-- Modal de Criação (altura limitada + rolagem só no corpo) -->
+<div id="createModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-[110]">
+    <div class="flex min-h-full items-center justify-center p-4 py-8">
+        <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[85vh] flex flex-col">
+            <div class="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
                 <h3 class="text-lg font-medium text-gray-900">Criar Novo Usuário</h3>
                 <button onclick="closeCreateModal()" class="text-gray-400 hover:text-gray-600">
                     <i class="fas fa-times text-xl"></i>
                 </button>
             </div>
-            <div class="p-6" id="createModalContent">
+            <div class="p-6 overflow-y-auto flex-1 min-h-0" id="createModalContent">
                 <div class="text-center">
                     <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
                     <p class="mt-2 text-gray-600">Carregando formulário...</p>
@@ -142,17 +170,17 @@
     </div>
 </div>
 
-<!-- Modal de Edição -->
-<div id="editModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
-    <div class="flex items-center justify-center min-h-screen p-4">
-        <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4">
-            <div class="flex items-center justify-between p-6 border-b border-gray-200">
+<!-- Modal de Edição (altura limitada + rolagem só no corpo) -->
+<div id="editModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-[110]">
+    <div class="flex min-h-full items-center justify-center p-4 py-8">
+        <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[85vh] flex flex-col">
+            <div class="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
                 <h3 class="text-lg font-medium text-gray-900">Editar Usuário</h3>
                 <button onclick="closeEditModal()" class="text-gray-400 hover:text-gray-600">
                     <i class="fas fa-times text-xl"></i>
                 </button>
             </div>
-            <div class="p-6" id="editModalContent">
+            <div class="p-6 overflow-y-auto flex-1 min-h-0" id="editModalContent">
                 <div class="text-center">
                     <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
                     <p class="mt-2 text-gray-600">Carregando formulário...</p>
@@ -163,7 +191,7 @@
 </div>
 
 <!-- Modal de URL Secreta -->
-<div id="secretUrlModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+<div id="secretUrlModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-[110]">
     <div class="flex items-center justify-center min-h-screen p-4">
         <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4">
             <div class="flex items-center justify-between p-6 border-b border-gray-200">
@@ -186,7 +214,7 @@
 </div>
 
 <!-- Modal Grupos (lista principal) -->
-<div id="groupsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-[10040]">
+<div id="groupsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-[110]">
     <div class="flex items-center justify-center min-h-screen p-4">
         <div class="bg-white rounded-lg shadow-xl max-w-3xl w-full mx-4 max-h-[90vh] flex flex-col">
             <div class="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
@@ -194,7 +222,7 @@
                 <button type="button" onclick="closeGroupsModal()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times text-xl"></i></button>
             </div>
             <div class="p-6 overflow-y-auto flex-1" id="groupsModalBody">
-                <p class="text-sm text-gray-600 mb-4">Cada grupo define quais abas do menu (Início, Servidores, Câmeras, Filiais e itens em <strong>Gerenciar</strong>) os usuários podem ver. O grupo <strong>Administradores</strong> não pode ser editado nem excluído.</p>
+                <p class="text-sm text-gray-600 mb-4">Cada grupo define quais abas do menu (Início, Servidores, Câmeras, Mapas de Rede e itens em <strong>Gerenciar</strong>) os usuários podem ver. O grupo <strong>Administradores</strong> não pode ser editado nem excluído.</p>
                 <div class="flex justify-end mb-4">
                     <button type="button" id="btnOpenCreateGroupModal" class="inline-flex items-center px-4 py-2 bg-amber-500 text-black text-sm font-semibold rounded-md hover:bg-amber-600">
                         <i class="fas fa-plus mr-2"></i>Novo grupo
@@ -207,7 +235,7 @@
 </div>
 
 <!-- Sub-modal: criar grupo -->
-<div id="createGroupModal" class="fixed inset-0 bg-gray-900 bg-opacity-40 overflow-y-auto h-full w-full hidden z-[10050]">
+<div id="createGroupModal" class="fixed inset-0 bg-gray-900 bg-opacity-40 overflow-y-auto h-full w-full hidden z-[120]">
     <div class="flex items-center justify-center min-h-screen p-4">
         <div class="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-[90vh] flex flex-col border-2 border-amber-200">
             <div class="flex items-center justify-between p-4 border-b border-gray-200">
@@ -236,7 +264,7 @@
 </div>
 
 <!-- Sub-modal: editar grupo -->
-<div id="editGroupModal" class="fixed inset-0 bg-gray-900 bg-opacity-40 overflow-y-auto h-full w-full hidden z-[10050]">
+<div id="editGroupModal" class="fixed inset-0 bg-gray-900 bg-opacity-40 overflow-y-auto h-full w-full hidden z-[120]">
     <div class="flex items-center justify-center min-h-screen p-4">
         <div class="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-[90vh] flex flex-col border-2 border-blue-200">
             <div class="flex items-center justify-between p-4 border-b border-gray-200">
@@ -267,7 +295,7 @@
 </div>
 
 <!-- Sub-modal: excluir grupo (senha) -->
-<div id="deleteGroupModal" class="fixed inset-0 bg-gray-900 bg-opacity-40 overflow-y-auto h-full w-full hidden z-[10050]">
+<div id="deleteGroupModal" class="fixed inset-0 bg-gray-900 bg-opacity-40 overflow-y-auto h-full w-full hidden z-[120]">
     <div class="flex items-center justify-center min-h-screen p-4">
         <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 border-2 border-red-200">
             <div class="flex items-center justify-between p-4 border-b border-gray-200">
@@ -307,11 +335,46 @@
         }
     }
 
+    function applySystemUserFilters() {
+        const q = (document.getElementById('system-users-search')?.value || '').trim().toLowerCase();
+        const gid = document.getElementById('system-users-filter-group')?.value || '';
+        const rows = document.querySelectorAll('tr.system-user-row');
+        let visible = 0;
+        rows.forEach(function(tr) {
+            let ok = true;
+            if (q) {
+                const hay = (tr.getAttribute('data-search') || '').toLowerCase();
+                if (hay.indexOf(q) === -1) ok = false;
+            }
+            if (gid && String(tr.getAttribute('data-group-id') || '') !== gid) ok = false;
+            if (ok) visible++;
+            tr.classList.toggle('hidden', !ok);
+        });
+        const er = document.getElementById('system-users-filter-empty');
+        if (er) er.classList.toggle('hidden', visible !== 0);
+    }
+
+    function setupSystemUserListFilters() {
+        const s = document.getElementById('system-users-search');
+        const g = document.getElementById('system-users-filter-group');
+        const r = document.getElementById('system-users-filter-reset');
+        if (s) s.addEventListener('input', applySystemUserFilters);
+        if (g) g.addEventListener('change', applySystemUserFilters);
+        if (r) {
+            r.addEventListener('click', function() {
+                if (s) s.value = '';
+                if (g) g.value = '';
+                applySystemUserFilters();
+            });
+        }
+    }
+
     // Aguardar o DOM estar pronto
     document.addEventListener('DOMContentLoaded', function() {
         setupEventListeners();
         setupModalCloseListeners();
         setupGroupsModalUi();
+        setupSystemUserListFilters();
     });
 
     function setupEventListeners() {

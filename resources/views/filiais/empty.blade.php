@@ -4,7 +4,7 @@
     <div class="flex justify-between items-center">
         <h2 class="font-semibold text-xl text-gray-800 leading-tight">
             <i class="fas fa-map-marked-alt mr-2" style="color: #E9B32C;"></i>
-            Filiais
+            Mapas de Rede
         </h2>
     </div>
 @endsection

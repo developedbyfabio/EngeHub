@@ -18,8 +18,9 @@ class ServerController extends Controller
     {
         $servers = Server::with(['dataCenter', 'serverGroup'])->orderBy('name')->get();
         $serverGroups = ServerGroup::active()->ordered()->get();
-        
-        return view('admin.servers.index', compact('servers', 'serverGroups'));
+        $dataCenters = DataCenter::orderBy('name')->get();
+
+        return view('admin.servers.index', compact('servers', 'serverGroups', 'dataCenters'));
     }
 
     /**

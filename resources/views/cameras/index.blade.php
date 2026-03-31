@@ -4,7 +4,7 @@
     <x-page-header title="Câmeras" icon="fas fa-video">
         <x-slot name="actions">
             @if($canUseCameraChecklist ?? false)
-            <button type="button" onclick="openIniciarChecklistModal()" class="page-header-btn-primary mr-2">
+            <button type="button" id="camerasTutorialIniciarChecklistBtn" onclick="openIniciarChecklistModal()" class="page-header-btn-primary mr-2">
                 <i class="fas fa-play mr-2"></i>
                 Iniciar Novo Checklist
             </button>
@@ -17,7 +17,7 @@
                 @endif
             </button>
             @endif
-            <button type="button" onclick="openHistoricoChecklistsModal()" class="page-header-btn-secondary mr-2">
+            <button type="button" id="camerasTutorialChecklistsBtn" onclick="openHistoricoChecklistsModal()" class="page-header-btn-secondary mr-2">
                 <i class="fas fa-history mr-2"></i>
                 Checklists
             </button>
@@ -929,4 +929,5 @@ function fecharModalConfirmarAbandonar() {
     }
 }
 </style>
+    @include('partials.cameras-page-tutorial')
 @endsection

@@ -8,7 +8,7 @@
                     
                     @if($tabs->count() > 0 || $favoritesTab)
                         <!-- Sistema de Abas com Filtros -->
-                        <div class="mb-8" x-data="{ 
+                        <div class="mb-8" id="homeTutorialPortalShell" x-data="{ 
                             activeTab: '{{ $favoritesTab ? 'favorites' : ($tabs->first() ? $tabs->first()->id : '') }}',
                             filters: {
                                 @if($favoritesTab)
@@ -99,17 +99,14 @@
                                 });
                             });
                         ">
-                            <!-- Container das Abas -->
-                            <div class="border-b border-gray-200">
-                                <nav class="-mb-px flex space-x-8 overflow-x-auto" aria-label="Tabs">
+                            <!-- Container das Abas (mesmo visual do menu principal: faixa preta, inativa cinza, ativa amarela) -->
+                            <div class="app-tabs-strip -mx-6 -mt-6 mb-6 flex flex-wrap items-end justify-between gap-2 border-b border-gray-800 bg-black px-4 sm:px-6 sm:rounded-t-lg">
+                                <nav id="homeTutorialTabStrip" class="-mb-px flex min-w-0 flex-1 space-x-6 overflow-x-auto sm:space-x-8" aria-label="Tabs">
                                     @if($favoritesTab)
                                         <button
                                             @click="activeTab = 'favorites'"
                                             :class="activeTab === 'favorites' ? 'tab-active' : 'tab-inactive'"
                                             class="tab-button whitespace-nowrap py-3 px-4 border-b-2 font-medium text-sm transition-all duration-200 flex items-center"
-                                            :style="activeTab === 'favorites' ? 
-                                                'border-color: {{ $favoritesTab->color }}; color: {{ $favoritesTab->color }}; background-color: {{ $favoritesTab->color }}15;' : 
-                                                'border-color: transparent; color: {{ $favoritesTab->color }};'"
                                         >
                                             <i class="fas fa-star mr-2"></i>
                                             {{ $favoritesTab->name }}
@@ -120,15 +117,18 @@
                                             @click="activeTab = '{{ $tab->id }}'"
                                             :class="activeTab === '{{ $tab->id }}' ? 'tab-active' : 'tab-inactive'"
                                             class="tab-button whitespace-nowrap py-3 px-4 border-b-2 font-medium text-sm transition-all duration-200 flex items-center"
-                                            :style="activeTab === '{{ $tab->id }}' ? 
-                                                'border-color: {{ $tab->color }}; color: {{ $tab->color }}; background-color: {{ $tab->color }}15;' : 
-                                                'border-color: transparent; color: {{ $tab->color }};'"
                                         >
                                             <i class="fas fa-folder mr-2"></i>
                                             {{ $tab->name }}
                                         </button>
                                     @endforeach
                                 </nav>
+                                <button type="button"
+                                        id="homeTutorialReplayBtn"
+                                        class="mb-1.5 shrink-0 rounded-lg border border-gray-600/80 bg-gray-900 px-3 py-2 text-xs font-medium text-gray-200 shadow-sm transition hover:border-amber-400/60 hover:bg-gray-800 hover:text-white focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 focus:ring-offset-black"
+                                        title="Tour pelo portal: abas, sistemas, favoritos e ramais">
+                                    Tutorial
+                                </button>
                             </div>
 
 
@@ -646,6 +646,10 @@
 
     @if(!empty($extensionListSvgUrl))
         @include('partials.extension-list-home', ['extensionListSvgUrl' => $extensionListSvgUrl])
+    @endif
+
+    @if($tabs->count() > 0 || $favoritesTab)
+        @include('partials.home-page-tutorial')
     @endif
 
     <style>
@@ -1363,9 +1367,12 @@
     <style>
         /* SISTEMA DE ABAS REFEITO - CSS OTIMIZADO */
         
-        /* Prevenir APENAS scroll horizontal */
+        /* Scroll horizontal sempre bloqueado; vertical só fora do tutorial (o tour aplica overflow hidden em html/body) */
         body, html {
             overflow-x: hidden !important;
+        }
+        html:not(.home-page-tutorial-active),
+        body:not(.home-page-tutorial-active) {
             overflow-y: auto !important;
         }
         
@@ -1377,8 +1384,8 @@
             transition: all 0.2s ease-in-out;
         }
         
-        .tab-button:hover {
-            background-color: rgba(0, 0, 0, 0.05);
+        .app-tabs-strip .tab-button:hover {
+            background-color: rgba(255, 255, 255, 0.06);
             transform: translateY(-1px);
         }
         
@@ -1387,13 +1394,8 @@
             font-weight: 600;
         }
         
-        .tab-inactive {
+        .app-tabs-strip .tab-inactive {
             border-bottom: 2px solid transparent;
-            opacity: 0.8;
-        }
-        
-        .tab-inactive:hover {
-            opacity: 1;
         }
         
     </style>

@@ -18,7 +18,7 @@
 <form method="GET" action="{{ route('servers.index') }}" id="{{ $formId }}" class="flex min-w-0 flex-wrap items-end gap-4 sm:items-center">
 @endif
     @if($datacenters->count() > 0)
-        <div class="flex flex-shrink-0 items-center">
+        <div class="flex flex-shrink-0 items-center" @if(!$clientFs) id="serversTutorialFilterDc" @endif>
             <label for="{{ $p }}datacenter_id" class="{{ $labelClass }}">
                 <i class="fas fa-building {{ $clientFs ? 'mr-0.5 sm:mr-1' : 'mr-1' }}"></i>
                 @if($clientFs)<span class="hidden sm:inline">DC</span>@else Datacenter @endif
@@ -38,7 +38,7 @@
         </div>
     @endif
 
-    <div class="flex flex-shrink-0 items-center">
+    <div class="flex flex-shrink-0 items-center" @if(!$clientFs) id="serversTutorialFilterOs" @endif>
         <label for="{{ $p }}operating_system" class="{{ $labelClass }}">
             <i class="fas fa-desktop {{ $clientFs ? 'mr-0.5 sm:mr-1' : 'mr-1' }}"></i>
             @if($clientFs)<span class="hidden sm:inline">SO</span>@else Sistema Operacional @endif
@@ -55,7 +55,7 @@
     </div>
 
     @if($serverGroups->count() > 0)
-        <div class="flex flex-shrink-0 items-center">
+        <div class="flex flex-shrink-0 items-center" @if(!$clientFs) id="serversTutorialFilterGrp" @endif>
             <label for="{{ $p }}server_group_id" class="{{ $labelClass }}">
                 <i class="fas fa-folder {{ $clientFs ? 'mr-0.5 sm:mr-1' : 'mr-1' }}"></i>
                 Grupo

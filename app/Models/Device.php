@@ -10,6 +10,9 @@ class Device extends Model
 {
     public const TYPES = ['SEAT', 'PRINTER', 'TV', 'SCAN', 'PHONE', 'AP', 'OUTLET'];
 
+    /** Ordem de exibição no painel de filtros e nos resumos do mapa (Filiais). */
+    public const MAP_LAYER_TYPE_ORDER = ['OUTLET', 'SEAT', 'PRINTER', 'SCAN', 'TV', 'PHONE', 'AP'];
+
     public const TYPE_REGEX = '/^(SEAT|PRINTER|TV|SCAN|PHONE|AP)-[A-Z0-9\-]+$/';
 
     /** Rótulo simples no SVG para ponto de tomada (ex.: A01, B02). */
@@ -32,6 +35,21 @@ class Device extends Model
     public function networkMap(): BelongsTo
     {
         return $this->belongsTo(NetworkMap::class);
+    }
+
+    /** Rótulo em português (igual ao painel de camadas do SVG). */
+    public static function mapLayerTypeLabel(string $type): string
+    {
+        return match ($type) {
+            'OUTLET' => 'Pontos (tomadas)',
+            'SEAT' => 'Mesas',
+            'PRINTER' => 'Impressoras',
+            'SCAN' => 'Scanners',
+            'TV' => 'TVs',
+            'PHONE' => 'Telefones',
+            'AP' => 'Access points',
+            default => $type,
+        };
     }
 
     public static function parseFullCode(string $full): ?array

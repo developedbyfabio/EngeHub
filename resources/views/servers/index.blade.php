@@ -32,8 +32,16 @@
                         $mainClearBtnClass = 'inline-flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-600 shadow-sm transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2';
                     @endphp
                     <div class="mb-6 flex min-w-0 flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end lg:justify-between lg:gap-4">
-                        <div class="min-w-0 flex-1">
+                        <div class="min-w-0 flex-1 flex flex-wrap items-end gap-2">
                             @include('servers.partials.filters-form', ['prefix' => ''])
+                            @if(($serversAllCount ?? 0) > 0)
+                                <button type="button"
+                                        id="serversPageTutorialReplayBtn"
+                                        class="inline-flex h-10 shrink-0 items-center rounded-lg border border-gray-300 bg-white px-3 text-xs font-medium text-gray-700 shadow-sm transition hover:border-amber-400 hover:bg-amber-50 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-1"
+                                        title="Ver o tour dos filtros, cartões e tela cheia">
+                                    Tutorial
+                                </button>
+                            @endif
                         </div>
                         <div class="flex flex-shrink-0 flex-nowrap items-end gap-2">
                             @if($hasMainFilters)
@@ -397,4 +405,7 @@ function checkServerStatus(serverId, buttonEl) {
     });
 }
 </script>
+    @if(($serversAllCount ?? 0) > 0)
+        @include('servers.partials.servers-page-tutorial')
+    @endif
 @endsection

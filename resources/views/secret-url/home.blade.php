@@ -75,7 +75,7 @@
                     ">
                         
                         <!-- Botões das Abas -->
-                        <div class="bg-black rounded-t-lg">
+                        <div class="app-tabs-strip bg-black rounded-t-lg">
                             <nav class="-mb-px flex space-x-8 overflow-x-auto" aria-label="Tabs">
                                 <button
                                     @click="activeTab = 'colaborador'"

@@ -47,7 +47,15 @@
                                                     <div class="text-sm font-medium text-gray-900">{{ $map->name }}</div>
                                                 </div>
                                             </td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ $map->file_name }}</td>
+                                            <td class="px-6 py-4 text-sm text-gray-600 max-w-xs">
+                                                <div class="break-all">{{ $map->file_name }}</div>
+                                                @if($map->has_two_floors)
+                                                    <div class="mt-1 text-xs font-medium text-amber-800">2 andares</div>
+                                                    @if($map->file_name_floor2)
+                                                        <div class="break-all text-xs text-gray-500 mt-0.5">2º: {{ $map->file_name_floor2 }}</div>
+                                                    @endif
+                                                @endif
+                                            </td>
                                             <td class="px-6 py-4 whitespace-nowrap">
                                                 @if($map->is_active)
                                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Ativo</span>

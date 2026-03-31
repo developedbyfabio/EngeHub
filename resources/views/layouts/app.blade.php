@@ -23,16 +23,39 @@
 </head>
 <body class="font-sans antialiased custom-wallpaper-bg">
     <div class="min-h-screen">
-        @include('layouts.navigation')
+        {{-- Fixo no viewport: sticky falha com wallpaper fixed no body / ancestrais; spacer empurra o <main>. --}}
+        <div id="app-fixed-top" class="fixed left-0 right-0 top-0 z-[100] shadow-md">
+            @include('layouts.navigation')
 
-        <!-- Page Heading -->
-        @hasSection('header')
-            <header class="bg-white shadow">
-                <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-                    @yield('header')
-                </div>
-            </header>
-        @endif
+            @hasSection('header')
+                <header class="relative z-0 border-b border-gray-200 bg-white">
+                    <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+                        @yield('header')
+                    </div>
+                </header>
+            @endif
+        </div>
+        <div id="app-fixed-top-spacer" class="pointer-events-none min-h-[4.5rem] select-none" aria-hidden="true"></div>
+        <script>
+        (function () {
+            var fixed = document.getElementById('app-fixed-top');
+            var spacer = document.getElementById('app-fixed-top-spacer');
+            if (!fixed || !spacer) return;
+            function syncAppFixedTopSpacer() {
+                spacer.style.height = fixed.offsetHeight + 'px';
+            }
+            syncAppFixedTopSpacer();
+            requestAnimationFrame(syncAppFixedTopSpacer);
+            window.addEventListener('resize', syncAppFixedTopSpacer);
+            document.addEventListener('DOMContentLoaded', syncAppFixedTopSpacer);
+            if (window.ResizeObserver) {
+                new ResizeObserver(syncAppFixedTopSpacer).observe(fixed);
+            }
+            if (document.fonts && document.fonts.ready) {
+                document.fonts.ready.then(syncAppFixedTopSpacer).catch(function () {});
+            }
+        })();
+        </script>
 
         <!-- Page Content -->
         <main>
@@ -272,13 +295,13 @@
         main .text-gray-600 { color: #4b5563 !important; }
         main .text-gray-500 { color: #6b7280 !important; }
         
-        /* Cabeçalho fixo — z-index abaixo dos modais (Tailwind z-50 = 50) para overlays cobrirem o header */
-        nav {
-            position: fixed !important;
-            top: 0;
-            left: 0;
-            right: 0;
-            z-index: 40;
+        /* Nav dentro do bloco #app-fixed-top: fluxo normal (o wrapper inteiro é position:fixed). */
+        #app-fixed-top > nav {
+            position: relative !important;
+            top: auto !important;
+            left: auto !important;
+            right: auto !important;
+            z-index: 1;
             background-color: #000000 !important;
             border-bottom: 1px solid #333333;
         }
@@ -289,11 +312,19 @@
             color: white !important;
         }
         
-        /* Forçar cor branca para abas dos sistemas quando não selecionadas */
-        .tab-inactive,
-        .tab-inactive *,
-        .tab-inactive i {
-            color: white !important;
+        /*
+         * Abas em faixa escura (.app-tabs-strip): inativas em cinza claro (legível no preto).
+         * Não aplicar branco globalmente — quebrava a página Início quando a faixa era clara.
+         */
+        .app-tabs-strip .tab-inactive,
+        .app-tabs-strip .tab-inactive *,
+        .app-tabs-strip .tab-inactive i {
+            color: #d1d5db !important; /* gray-300 */
+        }
+        .app-tabs-strip .tab-inactive:hover,
+        .app-tabs-strip .tab-inactive:hover *,
+        .app-tabs-strip .tab-inactive:hover i {
+            color: #f9fafb !important; /* gray-50 */
         }
         
         /* Forçar cor preta em todos os botões amarelos */
@@ -390,14 +421,13 @@
             color: #6b7280 !important;
         }
         
-        /* Ajustar layout para cabeçalho fixo */
+        /* Espaço do topo é o #app-fixed-top-spacer (altura sincronizada por JS); sem padding extra aqui. */
         .min-h-screen {
-            padding-top: 64px; /* Altura do nav fixo */
+            padding-top: 0;
         }
-        
+
         main {
             background: transparent;
-            min-height: calc(100vh - 64px);
         }
     </style>
     

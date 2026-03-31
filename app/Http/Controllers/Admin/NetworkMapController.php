@@ -7,8 +7,54 @@ use App\Models\Device;
 use App\Models\NetworkMap;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+
 class NetworkMapController extends Controller
 {
+    private function validateMapFiles(Request $request, bool $hasTwo, bool $isCreate): array
+    {
+        $messages = [
+            'name.required' => 'O nome do mapa é obrigatório.',
+            'file.required' => $hasTwo ? 'Selecione o arquivo SVG do 1º andar.' : 'Selecione um arquivo SVG.',
+            'file_floor2.required' => 'Selecione o arquivo SVG do 2º andar.',
+            'file.mimes' => 'O arquivo deve ser do tipo SVG.',
+            'file_floor2.mimes' => 'O arquivo do 2º andar deve ser do tipo SVG.',
+        ];
+
+        if ($isCreate) {
+            $rules = [
+                'name' => 'required|string|max:255',
+                'is_active' => 'nullable|boolean',
+                'has_two_floors' => 'nullable|boolean',
+            ];
+            if ($hasTwo) {
+                $rules['file'] = 'required|file|mimes:svg|max:10240';
+                $rules['file_floor2'] = 'required|file|mimes:svg|max:10240';
+            } else {
+                $rules['file'] = 'required|file|mimes:svg|max:10240';
+            }
+
+            return $request->validate($rules, $messages);
+        }
+
+        $rules = [
+            'name' => 'required|string|max:255',
+            'is_active' => 'nullable|boolean',
+            'has_two_floors' => 'nullable|boolean',
+            'file' => 'nullable|file|mimes:svg|max:10240',
+            'file_floor2' => 'nullable|file|mimes:svg|max:10240',
+        ];
+
+        return $request->validate($rules, $messages);
+    }
+
+    private function storeUploadedSvg($uploadedFile): string
+    {
+        $fileName = time().'_'.preg_replace('/[^a-zA-Z0-9._-]/', '_', $uploadedFile->getClientOriginalName());
+        $uploadedFile->move(public_path('media'), $fileName);
+
+        return $fileName;
+    }
+
     public function index()
     {
         $maps = NetworkMap::withCount('devices')->latest()->paginate(10);
@@ -23,37 +69,71 @@ class NetworkMapController extends Controller
 
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'file' => 'required|file|mimes:svg|max:10240',
-            'is_active' => 'nullable|boolean',
-        ], [
-            'name.required' => 'O nome do mapa é obrigatório.',
-            'file.required' => 'Selecione um arquivo SVG.',
-            'file.mimes' => 'O arquivo deve ser do tipo SVG.',
-        ]);
+        $hasTwo = $request->boolean('has_two_floors');
+        $validated = $this->validateMapFiles($request, $hasTwo, true);
 
-        $file = $request->file('file');
-        $fileName = time().'_'.preg_replace('/[^a-zA-Z0-9._-]/', '_', $file->getClientOriginalName());
-        $file->move(public_path('media'), $fileName);
+        $fileName = $this->storeUploadedSvg($request->file('file'));
+        $fileNameFloor2 = null;
+        if ($hasTwo) {
+            $fileNameFloor2 = $this->storeUploadedSvg($request->file('file_floor2'));
+        }
 
         $map = NetworkMap::create([
             'name' => $validated['name'],
             'file_name' => $fileName,
             'file_path' => '/media/',
+            'file_name_floor2' => $fileNameFloor2,
+            'has_two_floors' => $hasTwo,
             'is_active' => $request->boolean('is_active', true),
         ]);
 
         $synced = $map->syncDevicesFromSvg();
 
         return redirect()->route('admin.network-maps.index')
-            ->with('success', 'Mapa criado com sucesso. '.$synced.' dispositivo(s) detectado(s) no SVG.');
+            ->with('success', 'Mapa criado com sucesso. '.$synced.' dispositivo(s) detectado(s) na varredura do(s) SVG(s).');
     }
 
-    public function show(NetworkMap $network_map)
+    /**
+     * JSON com o SVG bruto de um andar (para troca de andar sem recarregar a página).
+     */
+    public function svgFloorJson(Request $request, NetworkMap $network_map)
+    {
+        $floor = (int) $request->query('floor', 1);
+        if ($floor !== 2) {
+            $floor = 1;
+        }
+        if ($floor === 2 && ! $network_map->has_two_floors) {
+            return response()->json(['success' => false, 'message' => 'Este mapa não possui segundo andar.'], 422);
+        }
+
+        $svg = $network_map->getSvgContentForFloor($floor);
+        if ($svg === null || $svg === '') {
+            return response()->json([
+                'success' => false,
+                'message' => $floor === 2 ? 'SVG do 2º andar não encontrado.' : 'SVG não encontrado.',
+                'floor' => $floor,
+            ], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'floor' => $floor,
+            'svg' => $svg,
+        ]);
+    }
+
+    public function show(Request $request, NetworkMap $network_map)
     {
         $network_map->load(['devices']);
-        $svgContent = $network_map->fileExists() ? $network_map->getSvgContent() : null;
+        $floor = (int) $request->query('floor', 1);
+        if ($floor !== 2) {
+            $floor = 1;
+        }
+        if ($floor === 2 && ! $network_map->has_two_floors) {
+            $floor = 1;
+        }
+
+        $svgContent = $network_map->getSvgContentForFloor($floor);
 
         $deviceLabels = $network_map->devices
             ->where('type', 'SEAT')
@@ -67,6 +147,7 @@ class NetworkMapController extends Controller
         return view('admin.network-maps.show', [
             'network_map' => $network_map,
             'svgContent' => $svgContent,
+            'mapActiveFloor' => $floor,
             'deviceLabels' => $deviceLabels,
             'canEditDevices' => true,
         ]);
@@ -218,23 +299,38 @@ class NetworkMapController extends Controller
 
     public function update(Request $request, NetworkMap $network_map)
     {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'file' => 'nullable|file|mimes:svg|max:10240',
-            'is_active' => 'nullable|boolean',
-        ]);
+        $hasTwo = $request->boolean('has_two_floors');
+        $validated = $this->validateMapFiles($request, $hasTwo, false);
+
+        if ($hasTwo && ! $network_map->file_name_floor2 && ! $request->hasFile('file_floor2')) {
+            return redirect()->back()
+                ->withErrors(['file_floor2' => 'Envie o SVG do 2º andar ou desmarque a opção de dois andares.'])
+                ->withInput();
+        }
 
         if ($request->hasFile('file')) {
             if ($network_map->fileExists()) {
                 @unlink($network_map->full_path);
             }
-            $file = $request->file('file');
-            $fileName = time().'_'.preg_replace('/[^a-zA-Z0-9._-]/', '_', $file->getClientOriginalName());
-            $file->move(public_path('media'), $fileName);
-            $network_map->file_name = $fileName;
+            $network_map->file_name = $this->storeUploadedSvg($request->file('file'));
+        }
+
+        if ($hasTwo && $request->hasFile('file_floor2')) {
+            if ($network_map->fileExistsFloor2()) {
+                @unlink($network_map->full_path_floor2);
+            }
+            $network_map->file_name_floor2 = $this->storeUploadedSvg($request->file('file_floor2'));
+        }
+
+        if (! $hasTwo && $network_map->has_two_floors) {
+            if ($network_map->fileExistsFloor2()) {
+                @unlink($network_map->full_path_floor2);
+            }
+            $network_map->file_name_floor2 = null;
         }
 
         $network_map->name = $validated['name'];
+        $network_map->has_two_floors = $hasTwo;
         $network_map->is_active = $request->boolean('is_active', $network_map->is_active);
         $network_map->save();
 
@@ -248,6 +344,9 @@ class NetworkMapController extends Controller
     {
         if ($network_map->fileExists()) {
             @unlink($network_map->full_path);
+        }
+        if ($network_map->fileExistsFloor2()) {
+            @unlink($network_map->full_path_floor2);
         }
         $network_map->delete();
 

@@ -21,7 +21,16 @@ class FiliaisController extends Controller
         $network_map = $maps->firstWhere('id', (int) $request->query('map')) ?? $maps->first();
 
         $network_map->load(['devices']);
-        $svgContent = $network_map->fileExists() ? $network_map->getSvgContent() : null;
+
+        $mapActiveFloor = (int) $request->query('floor', 1);
+        if ($mapActiveFloor !== 2) {
+            $mapActiveFloor = 1;
+        }
+        if ($mapActiveFloor === 2 && ! $network_map->has_two_floors) {
+            $mapActiveFloor = 1;
+        }
+
+        $svgContent = $network_map->getSvgContentForFloor($mapActiveFloor);
 
         $deviceLabels = $network_map->devices
             ->where('type', 'SEAT')
@@ -32,6 +41,8 @@ class FiliaisController extends Controller
             })
             ->toArray();
 
+        $deviceCountsByType = $network_map->devices->countBy('type')->all();
+
         $filiaisMode = true;
         $canEditDevices = auth()->guard('web')->check()
             && auth()->guard('web')->user()->canAccessNav(NavPermission::ADMIN_NETWORK_MAPS);
@@ -39,11 +50,25 @@ class FiliaisController extends Controller
         return view('admin.network-maps.show', compact(
             'network_map',
             'svgContent',
+            'mapActiveFloor',
             'deviceLabels',
+            'deviceCountsByType',
             'maps',
             'filiaisMode',
             'canEditDevices'
         ));
+    }
+
+    /**
+     * SVG de um andar em JSON (mapas ativos — mesma permissão da página Filiais).
+     */
+    public function mapSvgContent(Request $request, NetworkMap $network_map)
+    {
+        if (! $network_map->is_active) {
+            abort(404);
+        }
+
+        return app(NetworkMapController::class)->svgFloorJson($request, $network_map);
     }
 
     /**

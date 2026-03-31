@@ -25,6 +25,43 @@
         <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
             <div class="p-6 text-gray-900">
                 @if($servers->count() > 0)
+                    <div class="mb-4 flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end">
+                        <div class="flex-1 min-w-[200px]">
+                            <label for="admin-servers-search" class="block text-xs font-medium text-gray-500 mb-1">Buscar (nome, IP ou descrição)</label>
+                            <input type="search" id="admin-servers-search" autocomplete="off" placeholder="Ex.: AD ou 192.168…" class="w-full rounded-md border-gray-300 shadow-sm text-sm focus:border-primary-500 focus:ring-primary-500">
+                        </div>
+                        <div class="w-full sm:w-auto sm:min-w-[10rem]">
+                            <label for="admin-servers-filter-dc" class="block text-xs font-medium text-gray-500 mb-1">Data Center</label>
+                            <select id="admin-servers-filter-dc" class="w-full rounded-md border-gray-300 shadow-sm text-sm focus:border-primary-500 focus:ring-primary-500">
+                                <option value="">Todos</option>
+                                @foreach($dataCenters as $dc)
+                                    <option value="{{ $dc->id }}">{{ $dc->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="w-full sm:w-auto sm:min-w-[9rem]">
+                            <label for="admin-servers-filter-os" class="block text-xs font-medium text-gray-500 mb-1">Sistema</label>
+                            <select id="admin-servers-filter-os" class="w-full rounded-md border-gray-300 shadow-sm text-sm focus:border-primary-500 focus:ring-primary-500">
+                                <option value="">Todos</option>
+                                <option value="Linux">Linux</option>
+                                <option value="Windows">Windows</option>
+                                <option value="Outros">Outros</option>
+                                <option value="__none__">Sem sistema</option>
+                            </select>
+                        </div>
+                        <div class="w-full sm:w-auto sm:min-w-[9rem]">
+                            <label for="admin-servers-filter-status" class="block text-xs font-medium text-gray-500 mb-1">Status</label>
+                            <select id="admin-servers-filter-status" class="w-full rounded-md border-gray-300 shadow-sm text-sm focus:border-primary-500 focus:ring-primary-500">
+                                <option value="">Todos</option>
+                                <option value="online">Online</option>
+                                <option value="offline">Offline</option>
+                                <option value="unknown">Desconhecido</option>
+                            </select>
+                        </div>
+                        <button type="button" id="admin-servers-filter-reset" class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-xs font-medium text-gray-700 bg-white hover:bg-gray-50">
+                            <i class="fas fa-undo-alt mr-1.5 text-gray-400"></i> Limpar filtros
+                        </button>
+                    </div>
                     <!-- Tabela de Servidores (larguras fixas para evitar rolagem horizontal) -->
                     <div class="overflow-hidden">
                         <table class="w-full table-fixed divide-y divide-gray-200">
@@ -64,7 +101,7 @@
                             </thead>
                             <tbody class="bg-white divide-y divide-gray-200">
                                 @foreach($servers as $server)
-                                    <tr class="hover:bg-gray-50">
+                                    <tr class="admin-server-row hover:bg-gray-50" data-search="{{ Str::lower($server->name.' '.$server->ip_address.' '.($server->description ?? '')) }}" data-dc-id="{{ $server->data_center_id ?? '' }}" data-os="{{ $server->operating_system ?? '' }}" data-status="{{ $server->status ?: 'unknown' }}">
                                         <td class="px-3 py-4 align-top overflow-hidden">
                                             <div class="flex items-start gap-2 min-w-0">
                                                 @if($server->logo_url)
@@ -153,6 +190,11 @@
                                         </td>
                                     </tr>
                                 @endforeach
+                                <tr id="admin-servers-filter-empty" class="hidden">
+                                    <td colspan="7" class="px-3 py-10 text-center text-sm text-gray-500">
+                                        Nenhum servidor corresponde aos filtros selecionados.
+                                    </td>
+                                </tr>
                             </tbody>
                         </table>
                     </div>
@@ -177,8 +219,8 @@
     </div>
 </div>
 
-<!-- Modal (z-index acima do nav fixo z-40; altura limitada à viewport com rolagem interna) -->
-<div id="serverModal" class="fixed inset-0 z-[100] flex items-center justify-center bg-gray-600 bg-opacity-50 p-4 hidden">
+<!-- Modal (z-index acima de #app-fixed-top z-[100]) -->
+<div id="serverModal" class="fixed inset-0 z-[110] flex items-center justify-center bg-gray-600 bg-opacity-50 p-4 hidden">
     <div class="relative flex min-h-0 w-full max-w-2xl max-h-[min(90vh,calc(100dvh-2rem))] flex-col rounded-md border border-gray-200 bg-white shadow-lg">
         <div id="modalContent" class="min-h-0 flex-1 overflow-y-auto px-5 py-5">
             <!-- Conteúdo será carregado aqui -->
@@ -594,7 +636,7 @@ function openEditGroupModal(groupId) {
             // Criar modal de edição dinâmico
             const editModal = document.createElement('div');
             editModal.id = 'editGroupModal';
-            editModal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center';
+            editModal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-[120] flex items-center justify-center';
             editModal.innerHTML = `
                 <div class="w-11/12 md:w-2/3 lg:w-1/2 shadow-lg rounded-md bg-white">
                     <div class="flex justify-between items-center mb-4 px-6 pt-4">
@@ -1104,7 +1146,7 @@ function cancelDataCenterEdit(dataCenterId) {
 </script>
 
 <!-- Modal de Grupos de Servidores -->
-<div id="manageGroupsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50 flex items-center justify-center delete-confirm-modal">
+<div id="manageGroupsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-[110] flex items-center justify-center delete-confirm-modal">
     <div class="w-11/12 md:w-2/3 lg:w-1/2 shadow-lg rounded-md bg-white modal-content delete-confirm-content">
         <!-- Cabeçalho -->
         <div class="flex justify-between items-center mb-4 px-6 pt-4">
@@ -1144,7 +1186,7 @@ function cancelDataCenterEdit(dataCenterId) {
 </div>
 
 <!-- Modal Data Centers -->
-<div id="dataCentersModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50 flex items-center justify-center delete-confirm-modal">
+<div id="dataCentersModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-[110] flex items-center justify-center delete-confirm-modal">
     <div class="w-11/12 md:w-2/3 lg:w-1/2 shadow-lg rounded-md bg-white modal-content delete-confirm-content">
         <div class="flex justify-between items-center mb-4 px-6 pt-4">
             <h3 class="text-lg font-medium text-gray-900">Gerenciar Data Centers</h3>
@@ -1175,7 +1217,7 @@ function cancelDataCenterEdit(dataCenterId) {
     </div>
 </div>
 
-<div id="deleteDataCenterConfirmModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50 flex items-center justify-center delete-confirm-modal">
+<div id="deleteDataCenterConfirmModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-[120] flex items-center justify-center delete-confirm-modal">
     <div class="w-96 shadow-lg rounded-md bg-white delete-confirm-content">
         <div class="mt-3">
             <div class="flex items-center justify-center w-12 h-12 mx-auto bg-red-100 rounded-full delete-confirm-icon">
@@ -1196,5 +1238,58 @@ function cancelDataCenterEdit(dataCenterId) {
         </div>
     </div>
 </div>
+
+<script>
+(function() {
+    function applyAdminServerFilters() {
+        var q = (document.getElementById('admin-servers-search') && document.getElementById('admin-servers-search').value || '').trim().toLowerCase();
+        var dc = document.getElementById('admin-servers-filter-dc') ? document.getElementById('admin-servers-filter-dc').value : '';
+        var os = document.getElementById('admin-servers-filter-os') ? document.getElementById('admin-servers-filter-os').value : '';
+        var st = document.getElementById('admin-servers-filter-status') ? document.getElementById('admin-servers-filter-status').value : '';
+        var rows = document.querySelectorAll('tr.admin-server-row');
+        var visible = 0;
+        rows.forEach(function(tr) {
+            var ok = true;
+            if (q) {
+                var hay = (tr.getAttribute('data-search') || '').toLowerCase();
+                if (hay.indexOf(q) === -1) ok = false;
+            }
+            if (dc && String(tr.getAttribute('data-dc-id') || '') !== dc) ok = false;
+            if (os) {
+                var rowOs = tr.getAttribute('data-os') || '';
+                if (os === '__none__') {
+                    if (rowOs !== '') ok = false;
+                } else if (rowOs !== os) ok = false;
+            }
+            if (st && String(tr.getAttribute('data-status') || '') !== st) ok = false;
+            if (ok) visible++;
+            tr.classList.toggle('hidden', !ok);
+        });
+        var emptyRow = document.getElementById('admin-servers-filter-empty');
+        if (emptyRow) emptyRow.classList.toggle('hidden', visible !== 0);
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        var s = document.getElementById('admin-servers-search');
+        var dc = document.getElementById('admin-servers-filter-dc');
+        var os = document.getElementById('admin-servers-filter-os');
+        var st = document.getElementById('admin-servers-filter-status');
+        var reset = document.getElementById('admin-servers-filter-reset');
+        if (s) s.addEventListener('input', applyAdminServerFilters);
+        if (dc) dc.addEventListener('change', applyAdminServerFilters);
+        if (os) os.addEventListener('change', applyAdminServerFilters);
+        if (st) st.addEventListener('change', applyAdminServerFilters);
+        if (reset) {
+            reset.addEventListener('click', function() {
+                if (s) s.value = '';
+                if (dc) dc.value = '';
+                if (os) os.value = '';
+                if (st) st.value = '';
+                applyAdminServerFilters();
+            });
+        }
+    });
+})();
+</script>
 
 @endsection

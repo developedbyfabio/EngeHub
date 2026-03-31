@@ -329,7 +329,7 @@ function openPermissionsModal(systemLoginId) {
     
     // Mostrar modal com loading
     modal.innerHTML = `
-        <div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-[120]">
             <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
                 <div class="text-center">
                     <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
@@ -691,7 +691,7 @@ console.log('Função savePermissions disponível:', typeof window.savePermissio
 <div id="permissionsModal" class="hidden"></div>
 
 <!-- Modal de Edição de Login -->
-<div id="editSystemLoginModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+<div id="editSystemLoginModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-[120]">
     <div class="flex items-center justify-center min-h-screen p-4">
         <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
             <!-- Header -->

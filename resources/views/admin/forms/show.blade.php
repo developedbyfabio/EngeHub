@@ -189,7 +189,7 @@
 </div>
 
 {{-- Modal Limpar dados --}}
-<div id="modal-limpar" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden items-center justify-center p-4">
+<div id="modal-limpar" class="fixed inset-0 bg-black bg-opacity-50 z-[110] hidden items-center justify-center p-4">
     <div class="modal-dark rounded-xl p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto" @click.stop>
         <div class="flex justify-between items-center mb-4">
             <h3 class="text-lg font-semibold text-white">Limpar dados de teste</h3>
@@ -230,7 +230,7 @@
 </div>
 
 {{-- Modal Log de respostas --}}
-<div id="modal-log" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden items-center justify-center p-4">
+<div id="modal-log" class="fixed inset-0 bg-black bg-opacity-50 z-[110] hidden items-center justify-center p-4">
     <div class="modal-dark rounded-xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto" @click.stop>
         <div class="flex justify-between items-center mb-4">
             <h3 class="text-lg font-semibold text-white">Log de respostas</h3>
@@ -287,7 +287,7 @@
 </div>
 
 {{-- Modal Links --}}
-<div id="modal-links" class="fixed inset-0 bg-black bg-opacity-50 z-[10050] hidden items-center justify-center p-4">
+<div id="modal-links" class="fixed inset-0 bg-black bg-opacity-50 z-[110] hidden items-center justify-center p-4">
     <div class="modal-dark rounded-xl p-6 max-w-3xl w-full max-h-[75vh] overflow-y-auto" @click.stop>
         <div class="flex justify-between items-center mb-4">
             <h3 class="text-lg font-semibold text-white">Links</h3>
@@ -302,7 +302,7 @@
 </div>
 
 {{-- Modal Pesos Padrão (deste formulário) --}}
-<div id="modal-pesos-padrao" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden items-center justify-center p-4">
+<div id="modal-pesos-padrao" class="fixed inset-0 bg-black bg-opacity-50 z-[110] hidden items-center justify-center p-4">
     <div class="modal-dark rounded-xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto" @click.stop>
         <div class="flex justify-between items-center mb-4">
             <h3 class="text-lg font-semibold text-white">Pesos Padrão deste formulário</h3>
@@ -322,7 +322,7 @@
 </div>
 
 {{-- Modal Criar Perfil de Pesos Padrão --}}
-<div id="modal-pesos-padrao-create" class="fixed inset-0 bg-black bg-opacity-60 z-[60] hidden items-center justify-center p-4">
+<div id="modal-pesos-padrao-create" class="fixed inset-0 bg-black bg-opacity-60 z-[120] hidden items-center justify-center p-4">
     <div class="modal-dark rounded-xl p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto" @click.stop>
         <h3 class="text-lg font-semibold text-white mb-4">Novo perfil de Pesos Padrão</h3>
         @include('admin.forms.partials.modal-pesos-create-form', ['form' => $form])

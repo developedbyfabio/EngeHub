@@ -1,4 +1,4 @@
-<nav x-data="{ open: false }" class="bg-black border-b border-gray-800">
+<nav x-data="{ open: false }" class="relative z-[1] bg-black border-b border-gray-800">
     <!-- Primary Navigation Menu -->
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between h-16">
@@ -34,7 +34,7 @@
                         @endif
                         @if($showMainNavGuest || auth()->guard('system')->check() || ($webNavUser && $webNavUser->canAccessNav(\App\Support\NavPermission::FILIAIS)))
                         <x-nav-link :href="route('filiais.index')" :active="request()->routeIs('filiais.*')">
-                            {{ __('Filiais') }}
+                            {{ __('Mapas de Rede') }}
                         </x-nav-link>
                         @endif
                     @endif
@@ -170,7 +170,7 @@
                 @endif
                 @if($showMainNavGuestM || auth()->guard('system')->check() || ($webNavUserM && $webNavUserM->canAccessNav(\App\Support\NavPermission::FILIAIS)))
                 <x-responsive-nav-link :href="route('filiais.index')" :active="request()->routeIs('filiais.*')">
-                    {{ __('Filiais') }}
+                    {{ __('Mapas de Rede') }}
                 </x-responsive-nav-link>
                 @endif
             @endif

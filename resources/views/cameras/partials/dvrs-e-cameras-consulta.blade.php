@@ -1,12 +1,26 @@
 @props(['dvrs', 'problemaHistoricoPorCamera'])
 
-<div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+@php
+    $camerasTutorialDvrComFoto = $dvrs->first(fn ($d) => $d->fotos->isNotEmpty());
+@endphp
+
+<div id="camerasTutorialDvrCard" class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
     <div class="p-6">
-        <h2 class="text-lg font-semibold mb-2">
-            <i class="fas fa-server mr-2 text-slate-600"></i>
-            DVRs e Câmeras
-        </h2>
-        <p class="text-sm text-gray-500 mb-4">Visualização das fotos cadastradas. Para editar ou anexar imagens, use <strong>Gerenciar Câmeras</strong>.</p>
+        <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
+            <div class="min-w-0 flex-1">
+                <h2 class="text-lg font-semibold mb-2">
+                    <i class="fas fa-server mr-2 text-slate-600"></i>
+                    DVRs e Câmeras
+                </h2>
+                <p class="text-sm text-gray-500">Visualização das fotos cadastradas. Para editar ou anexar imagens, use <strong>Gerenciar Câmeras</strong>.</p>
+            </div>
+            <button type="button"
+                    id="camerasTutorialReplayBtn"
+                    class="shrink-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 shadow-sm transition hover:border-amber-400 hover:bg-amber-50 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-1"
+                    title="Tour por DVRs, fotos, checklists e histórico">
+                Tutorial
+            </button>
+        </div>
         @if($dvrs->count() > 0)
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200">
@@ -34,7 +48,9 @@
                             @endphp
                             <tr class="bg-white hover:bg-gray-50">
                                 <td class="px-4 py-3 whitespace-nowrap">
-                                    <button type="button" onclick="toggleDvrExpandConsulta({{ $dvr->id }})" class="text-gray-500 hover:text-gray-700 focus:outline-none" title="Expandir/recolher">
+                                    <button type="button"
+                                            @if($loop->first) id="camerasTutorialExpandBtn" @endif
+                                            onclick="toggleDvrExpandConsulta({{ $dvr->id }})" class="text-gray-500 hover:text-gray-700 focus:outline-none" title="Expandir/recolher">
                                         <i class="fas fa-chevron-right expand-icon-consulta transition-transform duration-200" id="expand-icon-consulta-{{ $dvr->id }}"></i>
                                     </button>
                                 </td>
@@ -46,7 +62,9 @@
                                 <td class="px-6 py-4 whitespace-nowrap text-sm">
                                     @if($dvr->fotos->isNotEmpty())
                                         @php $dvrThumbFoto = $dvr->fotos->sortByDesc(fn($f) => $f->created_at->timestamp)->first(); @endphp
-                                        <button type="button" onclick="openDvrFotoViewerConsulta({{ $dvr->id }})" class="cursor-pointer hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-1 rounded" title="Visualizar fotos dos DVRs">
+                                        <button type="button"
+                                                @if($camerasTutorialDvrComFoto && (int) $camerasTutorialDvrComFoto->id === (int) $dvr->id) id="camerasTutorialDvrPhotoBtn" @endif
+                                                onclick="openDvrFotoViewerConsulta({{ $dvr->id }})" class="cursor-pointer hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-1 rounded" title="Visualizar fotos dos DVRs">
                                             <img src="{{ asset('storage/' . $dvrThumbFoto->path) }}" alt="" class="h-10 w-auto rounded border border-gray-300 object-cover">
                                         </button>
                                     @else
@@ -57,7 +75,9 @@
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $dvr->status === 'ativo' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800' }}">{{ ucfirst($dvr->status) }}</span>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                    <button type="button" class="btn-historico-dvr-consulta text-indigo-600 hover:text-indigo-900" title="Histórico de fotos do DVR" data-dvr-nome="{{ e($dvr->nome) }}" data-historical="{{ base64_encode(json_encode($dvrFotoHistArrConsulta, JSON_UNESCAPED_UNICODE)) }}"><i class="fas fa-history"></i></button>
+                                    <button type="button"
+                                            @if($loop->first) id="camerasTutorialDvrHistoricoBtn" @endif
+                                            class="btn-historico-dvr-consulta text-indigo-600 hover:text-indigo-900" title="Histórico de fotos do DVR" data-dvr-nome="{{ e($dvr->nome) }}" data-historical="{{ base64_encode(json_encode($dvrFotoHistArrConsulta, JSON_UNESCAPED_UNICODE)) }}"><i class="fas fa-history"></i></button>
                                 </td>
                             </tr>
                             <tr data-dvr-cameras-consulta="{{ $dvr->id }}" class="dvr-cameras-row-consulta hidden bg-gray-50">
